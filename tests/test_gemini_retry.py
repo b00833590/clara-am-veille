@@ -1,7 +1,7 @@
 import pytest
 from google.genai.errors import ClientError
 
-from src.gemini_retry import RateLimiter, call_with_retry
+from src.gemini_retry import GeminiQuotaExhausted, RateLimiter, call_with_retry
 
 
 def rate_limit_error():
@@ -53,17 +53,18 @@ def test_reraises_non_429_errors_immediately_without_retry():
     assert calls["count"] == 1
 
 
-def test_gives_up_after_max_retries_and_raises_last_error():
+def test_gives_up_after_max_retries_and_raises_quota_exhausted():
     calls = {"count": 0}
 
     def always_429():
         calls["count"] += 1
         raise rate_limit_error()
 
-    with pytest.raises(ClientError):
+    with pytest.raises(GeminiQuotaExhausted) as exc_info:
         call_with_retry(always_429, sleep_fn=lambda _: None, max_retries=3, rate_limiter=fresh_limiter())
 
     assert calls["count"] == 4
+    assert isinstance(exc_info.value.__cause__, ClientError)
 
 
 class FakeClock:

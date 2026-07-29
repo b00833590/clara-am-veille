@@ -13,6 +13,17 @@ DEFAULT_BACKOFF_SCHEDULE = (15, 30, 60, 60, 60)
 MIN_CALL_INTERVAL_SECONDS = 13.0
 
 
+class GeminiQuotaExhausted(Exception):
+    """All retries were spent on 429s without success. Distinguished from a
+    plain APIError so callers processing many postings in a loop (see
+    src/orchestrator.py) can tell "per-minute throttling, try the next call"
+    apart from "quota is dead for the day, stop calling entirely" — confirmed
+    live on 2026-07-29: a GitHub Actions run hit the daily quota wall and
+    burned its full 45-minute timeout retrying every remaining ambiguous
+    posting for ~5 minutes each instead of failing fast.
+    """
+
+
 class RateLimiter:
     """Enforces a minimum interval between calls, shared across every caller
     holding the same instance. Needed because the Gemini free tier quota is
@@ -65,4 +76,4 @@ def call_with_retry(
                 raise
             last_error = exc
 
-    raise last_error
+    raise GeminiQuotaExhausted(str(last_error)) from last_error

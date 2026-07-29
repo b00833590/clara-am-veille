@@ -1,4 +1,5 @@
 from src.classification.gemini_classifier import ClassificationResult
+from src.gemini_retry import GeminiQuotaExhausted
 from src.generation.gemini_letter_generator import LetterDraft
 from src.models import JobPosting
 from src.orchestrator import retry_missing_letters, run_polling_pass
@@ -108,6 +109,25 @@ def test_classification_failure_is_not_stored_and_will_retry_next_run():
     assert not repository.exists(posting().stable_id())
     assert ("Comgest (classification)", "gemini down") in summary.errors
     assert notifier.notified == []
+
+
+def test_gemini_quota_exhaustion_aborts_the_rest_of_the_run():
+    repository = InMemoryJobRepository()
+    classifier = FakeClassifier(error=GeminiQuotaExhausted("quota gone"))
+    notifier = FakeNotifier()
+    second_posting = posting(url="https://comgest.com/2")
+    other_source_posting = posting(company="Amundi", url="https://amundi.com/1")
+    sources = [
+        ("Comgest", FakeFetcher(postings=[posting(), second_posting])),
+        ("Amundi", FakeFetcher(postings=[other_source_posting])),
+    ]
+
+    summary = run_polling_pass(sources, repository, classifier, notifier)
+
+    assert summary.new_postings == []
+    assert not repository.exists(second_posting.stable_id())
+    assert not repository.exists(other_source_posting.stable_id())
+    assert any("quota Gemini épuisé" in message for _, message in summary.errors)
 
 
 def test_off_topic_posting_is_stored_but_not_notified():

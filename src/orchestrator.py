@@ -3,6 +3,7 @@ from typing import Protocol
 
 from src.classification.gemini_classifier import ClassificationResult
 from src.fetchers.base import Fetcher
+from src.gemini_retry import GeminiQuotaExhausted
 from src.generation.gemini_letter_generator import LetterDraft
 from src.location_priority import location_priority
 from src.models import JobPosting
@@ -45,14 +46,22 @@ def run_polling_pass(
     summary = PollingSummary()
 
     for name, fetcher in sources:
+        print(f"[{name}] interrogation...", flush=True)
         try:
             postings = fetcher.fetch()
         except Exception as exc:
             summary.errors.append((name, str(exc)))
+            print(f"[{name}] erreur : {exc}", flush=True)
             continue
 
+        print(f"[{name}] {len(postings)} offre(s) trouvée(s)", flush=True)
         for posting in postings:
-            _process_posting(name, posting, repository, classifier, notifier, letter_generator, draft_creator, summary)
+            try:
+                _process_posting(name, posting, repository, classifier, notifier, letter_generator, draft_creator, summary)
+            except GeminiQuotaExhausted as exc:
+                summary.errors.append((name, f"quota Gemini épuisé pour la journée, arrêt du run : {exc}"))
+                print(f"[{name}] quota Gemini épuisé — arrêt du run, offres restantes retraitées au prochain passage", flush=True)
+                return summary
 
     return summary
 
@@ -70,10 +79,14 @@ def _process_posting(
     if repository.exists(posting.stable_id()):
         return
 
+    print(f"  [{source_name}] classification : {posting.title}", flush=True)
     try:
         result = classifier.classify(posting)
+    except GeminiQuotaExhausted:
+        raise
     except Exception as exc:
         summary.errors.append((f"{source_name} (classification)", str(exc)))
+        print(f"  [{source_name}] échec classification : {exc}", flush=True)
         return
 
     classified_posting = replace(
@@ -107,12 +120,16 @@ def _generate_letter(
     draft_creator: DraftCreator,
     summary: PollingSummary,
 ) -> None:
+    print(f"  [{source_name}] génération de la lettre : {posting.title}", flush=True)
     try:
         letter = letter_generator.generate(posting)
         draft_creator.create_draft(posting, letter)
         repository.update_letter(posting.stable_id(), letter.letter_text)
+    except GeminiQuotaExhausted:
+        raise
     except Exception as exc:
         summary.errors.append((f"{source_name} (lettre)", str(exc)))
+        print(f"  [{source_name}] échec génération de la lettre : {exc}", flush=True)
 
 
 def retry_missing_letters(
@@ -131,12 +148,18 @@ def retry_missing_letters(
     summary = PollingSummary()
 
     for posting in repository.postings_missing_letter():
+        print(f"[retry lettre] {posting.company} : {posting.title}", flush=True)
         try:
             letter = letter_generator.generate(posting)
             draft_creator.create_draft(posting, letter)
             repository.update_letter(posting.stable_id(), letter.letter_text)
             summary.new_postings.append(posting)
+        except GeminiQuotaExhausted as exc:
+            summary.errors.append((f"{posting.company} (lettre - retry)", f"quota Gemini épuisé, arrêt du rattrapage : {exc}"))
+            print("[retry lettre] quota Gemini épuisé — arrêt, offres restantes retraitées au prochain passage", flush=True)
+            return summary
         except Exception as exc:
             summary.errors.append((f"{posting.company} (lettre - retry)", str(exc)))
+            print(f"[retry lettre] échec pour {posting.company} : {exc}", flush=True)
 
     return summary

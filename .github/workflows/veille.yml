@@ -76,6 +76,8 @@ jobs:
           printf '%s' "$REFERENCE_LETTER_TXT" > data/reference_letter.txt
 
       - name: Lancer le pipeline
+        env:
+          PYTHONUNBUFFERED: "1"
         run: python main.py
 
       - name: Sauvegarder la base de données mise à jour
