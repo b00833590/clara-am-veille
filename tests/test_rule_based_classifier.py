@@ -15,8 +15,8 @@ def classify(title, description=""):
 # --- Ground truth from the real 2026-07-22 live Gemini run (see conversation
 # history) — these are not synthetic examples, they're the actual titles and
 # actual correct category/language pairs Gemini itself produced that day.
-# Cases the rule engine can't safely resolve (ambiguous or by design, e.g.
-# ESG/ISR) are expected to return None (escalate), not guess.
+# Now the sole classifier (2026-07-29, AM-strict): every case must resolve to
+# a decision, never escalate.
 
 @pytest.mark.parametrize(
     "title,expected_category,expected_language",
@@ -34,40 +34,62 @@ def classify(title, description=""):
         ("Stage H/F - Chargé de Projets - Intelligence Artificielle – Mars 2027", "N", "fr"),
         ("Investment specialist intern M/F", "A", "en"),
         ("Stage H/F - Private Equity – Janvier 2027", "A", "fr"),
+        ("Stage - Inside Sales - Data-as-a-Service H/F", "N", "fr"),
     ],
 )
 def test_matches_real_ground_truth_from_live_run(title, expected_category, expected_language):
     result = classify(title)
 
-    assert result is not None, f"expected a confident rule-based decision for {title!r}, got escalation"
     assert result.category == expected_category
     assert result.language == expected_language
     assert result.to_verify is False
 
 
+def test_esg_integrated_into_portfolio_management_is_classified_a_and_flagged():
+    # The explicit nuance the original prompt carved out: ESG-integrated-in-
+    # portfolio-management is A, never resolved by keyword alone — flagged
+    # to_verify=True since it's a judgment call, not a confident rule match.
+    result = classify("Stage Analyste ESG au sein de la Gestion Obligataire H/F")
+    assert result.category == "A"
+    assert result.to_verify is True
+
+
+def test_esg_standalone_function_is_classified_n_and_flagged():
+    result = classify("Stage H/F - Chargé de Mission RSE – Janvier 2027")
+    assert result.category == "N"
+    assert result.to_verify is True
+
+
+def test_conflicting_signals_resolve_to_n_and_are_flagged():
+    # Contains both a strong exclude signal (marketing) and a strong include
+    # signal (portfolio management) — the stated function usually describes
+    # the job better than the team it supports, but this is a judgment call.
+    result = classify("Stage Marketing pour l'équipe Portfolio Management H/F")
+    assert result.category == "N"
+    assert result.to_verify is True
+
+
 @pytest.mark.parametrize(
     "title",
     [
-        "Stage - Inside Sales - Data-as-a-Service H/F",  # no strong signal either way
-        "Stage - Projets Amundi Immobilier H/F",  # no strong signal either way
-        "DPM Clients M/F",  # category clear, but language can't be safely inferred from title alone
-        "Stage H/F - Développement Gestion Privée – Paris – Janvier 2027",  # ambiguous: "développement" alone isn't a safe AM signal
-        "Stage H/F - Analyste ESG/ISR (Gestion Obligataire) – Janvier 2027",  # deliberate: ESG/ISR always escalates
+        "Stage - Projets Amundi Immobilier H/F",
+        "Stage H/F - Développement Gestion Privée – Paris – Janvier 2027",
     ],
 )
-def test_escalates_ambiguous_or_edge_case_titles_rather_than_guessing(title):
-    assert classify(title) is None
+def test_no_strong_signal_either_way_defaults_to_a_and_is_flagged(title):
+    # No auto-exclude, no auto-include match: favors showing Clara a possible
+    # opportunity over silently dropping it, consistent with the original
+    # "en cas de doute, on montre" philosophy — she can always dismiss it.
+    result = classify(title)
+    assert result.category == "A"
+    assert result.to_verify is True
 
 
-def test_esg_always_escalates_even_with_a_clear_am_team_name_alongside_it():
-    # The explicit nuance the prompt carves out: ESG-integrated-in-portfolio-
-    # management is a cas limite that needs the LLM's judgment, never a
-    # keyword-only guess, regardless of what else is in the title.
-    assert classify("Stage Analyste ESG au sein de la Gestion Obligataire H/F") is None
-
-
-def test_conflicting_signals_escalate_rather_than_guess():
-    # Contains both a strong exclude signal (marketing) and a strong include
-    # signal (portfolio management) — must not silently pick one.
-    result = classify("Stage Marketing pour l'équipe Portfolio Management H/F")
-    assert result is None
+def test_language_uncertain_defaults_to_french_and_is_flagged():
+    # Category is clear (DPM Clients matches), but nothing in the title
+    # signals a language — defaults to "fr" (majority of target postings)
+    # rather than guessing wrong, and is flagged for Clara to confirm.
+    result = classify("DPM Clients M/F")
+    assert result.category == "A"
+    assert result.language == "fr"
+    assert result.to_verify is True

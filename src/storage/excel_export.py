@@ -3,7 +3,7 @@ from pathlib import Path
 from openpyxl import Workbook
 
 from src.scoring.relevance_scorer import score_posting
-from src.storage.excel_repository import HEADERS, SHEET_AM, SHEET_FINANCE, SHEET_OFF_TOPIC
+from src.storage.excel_repository import HEADERS, SHEET_AM, SHEET_OFF_TOPIC
 from src.storage.sqlite_repository import SQLiteJobRepository
 
 EXPORT_HEADERS = HEADERS + ["Score", "Score - Détail"]
@@ -12,8 +12,6 @@ EXPORT_HEADERS = HEADERS + ["Score", "Score - Détail"]
 def _sheet_for_category(category: str | None) -> str:
     if category == "A":
         return SHEET_AM
-    if category == "B":
-        return SHEET_FINANCE
     return SHEET_OFF_TOPIC
 
 
@@ -48,7 +46,7 @@ def export_to_excel(repository: SQLiteJobRepository, path: Path) -> None:
     workbook = Workbook()
     workbook.remove(workbook.active)
     sheets = {}
-    for sheet_name in (SHEET_AM, SHEET_FINANCE, SHEET_OFF_TOPIC):
+    for sheet_name in (SHEET_AM, SHEET_OFF_TOPIC):
         sheet = workbook.create_sheet(sheet_name)
         sheet.append(EXPORT_HEADERS)
         sheets[sheet_name] = sheet

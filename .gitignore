@@ -2,6 +2,7 @@
 client_secret.json
 token.json
 CLAUDE.md
+asset/
 __pycache__/
 *.pyc
 .venv/

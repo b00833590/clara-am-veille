@@ -18,12 +18,11 @@ def make_posting(**overrides):
     return defaults
 
 
-def test_category_a_scores_higher_than_b_which_scores_higher_than_n():
+def test_category_a_scores_higher_than_n():
     score_a = score_posting(make_posting(category="A")).score
-    score_b = score_posting(make_posting(category="B")).score
     score_n = score_posting(make_posting(category="N")).score
 
-    assert score_a > score_b > score_n
+    assert score_a > score_n
     assert score_n == 0
 
 

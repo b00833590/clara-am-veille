@@ -3,7 +3,7 @@ from email.mime.text import MIMEText
 
 from src.models import JobPosting
 
-CATEGORY_LABELS = {"A": "AM prioritaire", "B": "Finance hors AM"}
+CATEGORY_LABELS = {"A": "AM prioritaire"}
 
 
 def build_notification_message(posting: JobPosting, recipient_email: str) -> dict:

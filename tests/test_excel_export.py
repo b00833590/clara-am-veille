@@ -16,20 +16,19 @@ def make_posting(**overrides):
     return JobPosting(**defaults)
 
 
-def test_export_creates_xlsx_with_three_sheets(tmp_path):
+def test_export_creates_xlsx_with_two_sheets(tmp_path):
     repo = SQLiteJobRepository(tmp_path / "postings.db")
     xlsx_path = tmp_path / "export.xlsx"
 
     export_to_excel(repo, xlsx_path)
 
     workbook = load_workbook(xlsx_path)
-    assert set(workbook.sheetnames) == {"AM — Prioritaire", "Finance — Autres opportunités", "Hors sujet"}
+    assert set(workbook.sheetnames) == {"AM — Prioritaire", "Hors sujet"}
 
 
 def test_export_routes_postings_to_the_right_sheet_by_category(tmp_path):
     repo = SQLiteJobRepository(tmp_path / "postings.db")
     repo.add(make_posting(url="https://example.com/a", category="A"))
-    repo.add(make_posting(url="https://example.com/b", category="B"))
     repo.add(make_posting(url="https://example.com/n", category="N"))
     xlsx_path = tmp_path / "export.xlsx"
 
@@ -37,7 +36,6 @@ def test_export_routes_postings_to_the_right_sheet_by_category(tmp_path):
 
     workbook = load_workbook(xlsx_path)
     assert workbook["AM — Prioritaire"].max_row == 2  # header + 1 row
-    assert workbook["Finance — Autres opportunités"].max_row == 2
     assert workbook["Hors sujet"].max_row == 2
 
 

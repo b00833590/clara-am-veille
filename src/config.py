@@ -44,7 +44,7 @@ SOURCES: list[SourceConfig] = [
         "Amundi",
         TalentsoftFetcher(base_url="https://jobs.amundi.com", display_name="Amundi"),
     ),
-    SourceConfig("BNP Paribas", None, note="Protection anti-bot forte confirmée (403 'Access Denied' même en rendu Playwright complet) — pas un simple problème technique de scraping, contourner activement une protection de ce niveau n'est pas souhaitable. À surveiller manuellement en l'état."),
+    SourceConfig("BNP Paribas Asset Management", None, note="Re-vérifié le 2026-07-29 spécifiquement pour l'entité AM (liste prioritaire de Clara) : sa page carrières dédiée (group.bnpparibas/.../bnp-paribas-asset-management) est le MÊME domaine group.bnpparibas déjà bloqué (403 'Access Denied', confirmé de nouveau) — ce n'est pas une entité techniquement distincte, même protection anti-bot. Contourner activement une protection de ce niveau n'est pas souhaitable. Découverte importante au passage : BNP Paribas Cardif a finalisé le rachat d'AXA Investment Managers (fusion légale complète au 2025-12-31, marque unifiée 'BNP Paribas Asset Management', ~1600 Md€ d'actifs sous gestion) — voir la note sur 'Axa Investment Managers' ci-dessous, entité désormais probablement obsolète. À surveiller manuellement en l'état."),
     SourceConfig(
         "Lazard",
         OracleHcmFetcher(host="icbpjb.fa.ocs.oraclecloud.com", site_number="LazardStudentCareers", display_name="Lazard"),
@@ -60,6 +60,14 @@ SOURCES: list[SourceConfig] = [
     ),
     SourceConfig("Natixis", NatixisGroupFetcher()),
     SourceConfig("Natixis Investment Managers", NatixisIMFetcher()),
+    # AXA IM a été rachetée par BNP Paribas Cardif (fusion légale complète au
+    # 2025-12-31, marque unifiée "BNP Paribas Asset Management") — explique
+    # vraisemblablement le 0 constant sur ce fetcher plutôt qu'un bug ou une
+    # entité qui ne publie simplement pas. Portail Taleo dédié AXA IM
+    # (jobs.axa/careersection/axa_im_external) trouvé en marge de
+    # l'investigation BNP Paribas AM du 2026-07-29, mais actuellement "en
+    # maintenance" — laissé câblé (ne coûte rien), à réévaluer si BNP Paribas
+    # AM devient accessible un jour (couvrirait alors l'ex-AXA IM aussi).
     SourceConfig("Axa Investment Managers", AxaIMFetcher()),
     SourceConfig("JP Morgan Asset Management", JPMorganFetcher()),
     SourceConfig("Goldman Sachs Asset Management", GoldmanSachsFetcher()),
@@ -77,6 +85,22 @@ SOURCES: list[SourceConfig] = [
         OracleHcmFetcher(host="evht.fa.ocs.oraclecloud.eu", site_number="CX_7001", display_name="Edmond de Rothschild", locale="fr"),
     ),
     SourceConfig(
+        "OFI Invest",
+        FlatchrFetcher(url="https://ofiinvestassetmanagement.flatchr.io/", display_name="OFI Invest"),
+    ),
+    SourceConfig("DNCA Finance", None, note="DigitalRecruiters — confirmé cassé de bout en bout : accueil/annonces/API interne (api.digitalrecruiters.com, y compris depuis une session navigateur réelle) en 403/404, et même une page individuelle indexée par Google (/fr/annonce/3467775-...) renvoie désormais 404. Pas un problème de technique de scraping, le site est génuinement en panne côté DNCA. À réessayer périodiquement."),
+    SourceConfig("La Financière de l'Échiquier", None, note="Aucun ATS — pas trouvée sur Welcome to the Jungle ni sur JobTeaser avec les slugs/recherches essayés. Piste job board tiers à considérer épuisée pour l'instant ; à surveiller manuellement."),
+    SourceConfig("Pictet", None, note="SAP SuccessFactors confirmé (career012.successfactors.eu/career?company=banquepict, 51 offres visibles côté UI le 2026-07-22) mais instance legacy basée sur DWR (Direct Web Remoting, protocole AJAX-RPC Java à état de session) plutôt qu'une API REST/JSON claire comme les autres connecteurs SuccessFactors-like. Une requête GET directe avec le token _s.crb extrait de la session ne renvoie que le squelette de page (0 offre dans la réponse) — la vraie donnée nécessite de rejouer la séquence d'appels DWR (getInitialJobSearchData → updateUserSelectedValues → getPostingCount), plus fragile et plus coûteux que tout connecteur existant. Pas un problème de scraping classique ; à reprendre si l'effort est jugé justifié plutôt qu'à improviser."),
+    SourceConfig("Janus Henderson", None, note="SAP SuccessFactors Career Site Builder confirmé (jobs.janushenderson.com, identifiant company=Janus trouvé dans le HTML) — variante plus moderne que Pictet (endpoint REST/JSON réel POST /services/jobs/search/, pas de DWR), mais renvoie systématiquement {\"jobList\":[]} même avec company=Janus dans le payload : un paramètre requis (probablement lié à la session/cookie initiale, ou un champ obligatoire non identifié) manque encore. Investigué le 2026-07-22, pas résolu dans le temps imparti — à reprendre plutôt qu'à deviner un payload au hasard."),
+]
+
+# Connecteurs prêts et fonctionnels, mais hors des 20 entreprises prioritaires
+# de Clara (2026-07-29 — voir CLAUDE.md "Entreprises prioritaires") : "je ne
+# veux pas m'éparpiller, élargir seulement si aucune opportunité n'apparaît".
+# À réintégrer dans SOURCES (aucun code à réécrire) si l'élargissement devient
+# nécessaire.
+SOURCES_ON_HOLD: list[SourceConfig] = [
+    SourceConfig(
         "Schroders",
         OracleHcmFetcher(host="ekbq.fa.em2.oraclecloud.com", site_number="CX_2", display_name="Schroders"),
     ),
@@ -88,14 +112,6 @@ SOURCES: list[SourceConfig] = [
         "M&G",
         WorkdayFetcher(tenant="mgpru", wd_host="mgpru.wd3.myworkdayjobs.com", site="mandgprudential", display_name="M&G"),
     ),
-    SourceConfig(
-        "OFI Invest",
-        FlatchrFetcher(url="https://ofiinvestassetmanagement.flatchr.io/", display_name="OFI Invest"),
-    ),
-    SourceConfig("DNCA Finance", None, note="DigitalRecruiters — confirmé cassé de bout en bout : accueil/annonces/API interne (api.digitalrecruiters.com, y compris depuis une session navigateur réelle) en 403/404, et même une page individuelle indexée par Google (/fr/annonce/3467775-...) renvoie désormais 404. Pas un problème de technique de scraping, le site est génuinement en panne côté DNCA. À réessayer périodiquement."),
-    SourceConfig("La Financière de l'Échiquier", None, note="Aucun ATS — pas trouvée sur Welcome to the Jungle ni sur JobTeaser avec les slugs/recherches essayés. Piste job board tiers à considérer épuisée pour l'instant ; à surveiller manuellement."),
-    SourceConfig("Pictet", None, note="SAP SuccessFactors confirmé (career012.successfactors.eu/career?company=banquepict, 51 offres visibles côté UI le 2026-07-22) mais instance legacy basée sur DWR (Direct Web Remoting, protocole AJAX-RPC Java à état de session) plutôt qu'une API REST/JSON claire comme les autres connecteurs SuccessFactors-like. Une requête GET directe avec le token _s.crb extrait de la session ne renvoie que le squelette de page (0 offre dans la réponse) — la vraie donnée nécessite de rejouer la séquence d'appels DWR (getInitialJobSearchData → updateUserSelectedValues → getPostingCount), plus fragile et plus coûteux que tout connecteur existant. Pas un problème de scraping classique ; à reprendre si l'effort est jugé justifié plutôt qu'à improviser."),
-    SourceConfig("Janus Henderson", None, note="SAP SuccessFactors Career Site Builder confirmé (jobs.janushenderson.com, identifiant company=Janus trouvé dans le HTML) — variante plus moderne que Pictet (endpoint REST/JSON réel POST /services/jobs/search/, pas de DWR), mais renvoie systématiquement {\"jobList\":[]} même avec company=Janus dans le payload : un paramètre requis (probablement lié à la session/cookie initiale, ou un champ obligatoire non identifié) manque encore. Investigué le 2026-07-22, pas résolu dans le temps imparti — à reprendre plutôt qu'à deviner un payload au hasard."),
 ]
 
 

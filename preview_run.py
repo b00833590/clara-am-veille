@@ -15,8 +15,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 from dotenv import load_dotenv
 
-from src.classification.gemini_classifier import GeminiClassifier
-from src.classification.hybrid_classifier import HybridClassifier
+from src.classification.rule_based_classifier import RuleBasedClassifier
 from src.config import active_sources, pending_sources
 from src.generation.gemini_letter_generator import GeminiLetterGenerator, LetterDraft
 from src.models import JobPosting
@@ -48,7 +47,7 @@ def main() -> None:
 
     DB_PATH.parent.mkdir(exist_ok=True)
     repository = SQLiteJobRepository(DB_PATH)
-    classifier = HybridClassifier(gemini_classifier=GeminiClassifier.from_api_key(gemini_api_key))
+    classifier = RuleBasedClassifier()
     letter_generator = GeminiLetterGenerator.from_api_key(
         gemini_api_key,
         cv_text=CV_PATH.read_text(encoding="utf-8"),

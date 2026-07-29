@@ -1,4 +1,4 @@
-from src.classification.gemini_classifier import ClassificationResult
+from src.classification.models import ClassificationResult
 from src.gemini_retry import GeminiQuotaExhausted
 from src.generation.gemini_letter_generator import LetterDraft
 from src.models import JobPosting
@@ -197,9 +197,9 @@ def test_category_a_posting_triggers_letter_generation_and_draft_creation():
     assert summary.errors == []
 
 
-def test_category_b_posting_does_not_trigger_letter_generation():
+def test_off_topic_posting_does_not_trigger_letter_generation():
     repository = InMemoryJobRepository()
-    classifier = FakeClassifier(result=ClassificationResult(category="B", language="fr", to_verify=False))
+    classifier = FakeClassifier(result=ClassificationResult(category="N", language="fr", to_verify=False))
     notifier = FakeNotifier()
     letter_generator = FakeLetterGenerator()
     draft_creator = FakeDraftCreator()

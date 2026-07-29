@@ -2,7 +2,7 @@ import base64
 from email import message_from_bytes
 from email.header import decode_header
 
-from src.classification.gemini_classifier import ClassificationResult
+from src.classification.models import ClassificationResult
 from src.models import JobPosting
 from src.notifications.gmail_notifier import GmailNotifier, build_notification_message
 

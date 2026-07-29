@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-# Deterministic, rule-based scoring — no LLM call, consistent with the
-# quota-reduction work already done on classification (HybridClassifier).
-# Weights reflect the classification prompt's own priorities: category is the
-# dominant factor (an A posting is what actually matters), location is a
-# secondary tie-breaker (never an exclusion signal, per src/location_priority.py),
-# and the rest are confidence/freshness adjustments.
-CATEGORY_BASE_SCORE = {"A": 80, "B": 45, "N": 0}
+# Deterministic, rule-based scoring — no LLM call, consistent with
+# RuleBasedClassifier being the sole classifier (AM-strict, only A/N exist).
+# Category is the dominant factor, location is a secondary tie-breaker (never
+# an exclusion signal, per src/location_priority.py), and the rest are
+# confidence/freshness adjustments.
+CATEGORY_BASE_SCORE = {"A": 80, "N": 0}
 LOCATION_BONUS = {1: 15, 2: 10, 3: 5, 4: 0}
 TO_VERIFY_PENALTY = 5
 MISSING_REASON_PENALTY = 5

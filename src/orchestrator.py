@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field, replace
 from typing import Protocol
 
-from src.classification.gemini_classifier import ClassificationResult
+from src.classification.models import ClassificationResult
 from src.fetchers.base import Fetcher
 from src.gemini_retry import GeminiQuotaExhausted
 from src.generation.gemini_letter_generator import LetterDraft
