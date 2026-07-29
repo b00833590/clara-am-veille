@@ -1,4 +1,5 @@
 import pytest
+from google.genai._gaos.lib.compat_errors import APIStatusError, RateLimitError
 from google.genai.errors import ClientError
 
 from src.gemini_retry import GeminiQuotaExhausted, RateLimiter, call_with_retry
@@ -6,6 +7,23 @@ from src.gemini_retry import GeminiQuotaExhausted, RateLimiter, call_with_retry
 
 def rate_limit_error():
     return ClientError(429, {"error": {"message": "quota exceeded"}})
+
+
+class _FakeHttpResponse:
+    """Minimal stand-in for httpx.Response, just enough for RateLimitError."""
+
+    def __init__(self, status_code=429):
+        self.status_code = status_code
+        self.request = object()
+
+
+def compat_rate_limit_error():
+    # client.interactions.create() — used by GeminiClassifier and
+    # GeminiLetterGenerator — raises this DIFFERENT, OpenAI-compat-shaped
+    # exception on 429, not google.genai.errors.ClientError. Confirmed live on
+    # 2026-07-29: this was falling straight through call_with_retry uncaught,
+    # bypassing throttling/backoff/circuit-breaker entirely.
+    return RateLimitError(message="quota exceeded", response=_FakeHttpResponse(), body={"error": {"code": "too_many_requests"}})
 
 
 def fresh_limiter():
@@ -23,14 +41,15 @@ def test_returns_result_on_first_success():
     assert sleeps == []
 
 
-def test_retries_on_429_and_eventually_succeeds():
+@pytest.mark.parametrize("make_error", [rate_limit_error, compat_rate_limit_error])
+def test_retries_on_429_and_eventually_succeeds(make_error):
     sleeps = []
     calls = {"count": 0}
 
     def flaky():
         calls["count"] += 1
         if calls["count"] < 3:
-            raise rate_limit_error()
+            raise make_error()
         return "ok"
 
     result = call_with_retry(flaky, sleep_fn=sleeps.append, rate_limiter=fresh_limiter())
@@ -53,18 +72,32 @@ def test_reraises_non_429_errors_immediately_without_retry():
     assert calls["count"] == 1
 
 
-def test_gives_up_after_max_retries_and_raises_quota_exhausted():
+@pytest.mark.parametrize("make_error", [rate_limit_error, compat_rate_limit_error])
+def test_gives_up_after_max_retries_and_raises_quota_exhausted(make_error):
     calls = {"count": 0}
 
     def always_429():
         calls["count"] += 1
-        raise rate_limit_error()
+        raise make_error()
 
     with pytest.raises(GeminiQuotaExhausted) as exc_info:
         call_with_retry(always_429, sleep_fn=lambda _: None, max_retries=3, rate_limiter=fresh_limiter())
 
     assert calls["count"] == 4
-    assert isinstance(exc_info.value.__cause__, ClientError)
+    assert isinstance(exc_info.value.__cause__, type(make_error()))
+
+
+def test_reraises_non_429_compat_errors_immediately_without_retry():
+    calls = {"count": 0}
+
+    def always_400():
+        calls["count"] += 1
+        raise APIStatusError("bad request", response=_FakeHttpResponse(status_code=400), body={"error": {"message": "bad request"}})
+
+    with pytest.raises(Exception):  # noqa: B017 — asserting it's NOT swallowed as a retry
+        call_with_retry(always_400, sleep_fn=lambda _: None, rate_limiter=fresh_limiter())
+
+    assert calls["count"] == 1
 
 
 class FakeClock:

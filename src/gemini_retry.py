@@ -3,6 +3,25 @@ from typing import Callable, TypeVar
 
 from google.genai.errors import APIError
 
+# client.interactions.create() (used by GeminiClassifier/GeminiLetterGenerator)
+# raises a DIFFERENT, OpenAI-compat-shaped exception hierarchy than the classic
+# google.genai.errors.APIError this module was originally written against.
+# Confirmed live on 2026-07-29: every single 429 from this surface has a
+# .status_code, not a .code, and isn't an APIError instance at all — so it fell
+# straight through the `except APIError` below completely uncaught, meaning
+# throttling, backoff, and the quota circuit-breaker never actually engaged
+# despite looking correct in unit tests (which only ever mocked the legacy
+# google.genai.errors.ClientError). A GitHub Actions run burned real quota on
+# hundreds of rapid-fire, un-throttled requests as a result. Import is
+# defensive: if this internal path ever moves, we degrade to only catching the
+# legacy surface rather than crashing outright.
+try:
+    from google.genai._gaos.lib.compat_errors import APIStatusError as _CompatAPIStatusError
+
+    _RETRYABLE_EXCEPTION_TYPES: tuple[type[Exception], ...] = (APIError, _CompatAPIStatusError)
+except ImportError:
+    _RETRYABLE_EXCEPTION_TYPES = (APIError,)
+
 T = TypeVar("T")
 
 DEFAULT_BACKOFF_SCHEDULE = (15, 30, 60, 60, 60)
@@ -52,6 +71,10 @@ class RateLimiter:
 default_rate_limiter = RateLimiter()
 
 
+def _status_code(exc: Exception) -> int | None:
+    return getattr(exc, "code", None) if isinstance(exc, APIError) else getattr(exc, "status_code", None)
+
+
 def call_with_retry(
     func: Callable[[], T],
     sleep_fn: Callable[[float], None] = time.sleep,
@@ -63,7 +86,7 @@ def call_with_retry(
     backoff schedule. Any other error propagates immediately — retrying
     wouldn't help.
     """
-    last_error: APIError | None = None
+    last_error: Exception | None = None
 
     for attempt in range(max_retries + 1):
         if attempt > 0:
@@ -71,8 +94,8 @@ def call_with_retry(
         rate_limiter.wait(sleep_fn)
         try:
             return func()
-        except APIError as exc:
-            if exc.code != 429:
+        except _RETRYABLE_EXCEPTION_TYPES as exc:
+            if _status_code(exc) != 429:
                 raise
             last_error = exc
 
