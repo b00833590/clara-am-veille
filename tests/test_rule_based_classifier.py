@@ -35,6 +35,10 @@ def classify(title, description=""):
         ("Investment specialist intern M/F", "A", "en"),
         ("Stage H/F - Private Equity – Janvier 2027", "A", "fr"),
         ("Stage - Inside Sales - Data-as-a-Service H/F", "N", "fr"),
+        # Found live on 2026-07-29 running preview_run.py against Amundi's
+        # real postings: fell through to the "no signal" bucket and was
+        # wrongly defaulted to A — a generalist tech role, not AM.
+        ("Stage - Data ingénieur H/F", "N", "fr"),
     ],
 )
 def test_matches_real_ground_truth_from_live_run(title, expected_category, expected_language):
