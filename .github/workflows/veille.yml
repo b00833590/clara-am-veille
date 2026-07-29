@@ -28,7 +28,11 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 90 min pour absorber le rattrapage initial (premier run à froid contre
+    # les vraies données : ~250 offres à classifier/débiter au throttle
+    # Gemini de 13s/appel). Une fois la base rattrapée, les runs suivants ne
+    # traitent que le delta du jour et devraient rester bien en-deçà.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
