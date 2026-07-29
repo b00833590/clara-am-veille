@@ -28,13 +28,16 @@ Langue de rédaction requise (code) : {language} — écris l'intégralité de l
 
 Sélectionne dans le CV les expériences les plus pertinentes pour ce poste précis (pas forcément toutes), et adapte le paragraphe "pourquoi cette entreprise" à cette entreprise précise plutôt que d'utiliser une formule interchangeable.
 
-Réponds avec le texte complet de la lettre (corps uniquement, formule de politesse et signature "Clara Benhamou" incluses) et la liste des éléments non vérifiables à signaler à Clara.
+Le CV de Clara n'est PAS modifié pour cette candidature (envoyé tel quel) — indique séparément, en 2-3 phrases, quelles expériences de son CV mettre en avant à l'oral ou en tête de lecture pour ce poste précis, et pourquoi. Ne suggère jamais d'ajouter au CV une information qui n'y figure pas déjà.
+
+Réponds avec le texte complet de la lettre (corps uniquement, formule de politesse et signature "Clara Benhamou" incluses), la liste des éléments non vérifiables à signaler à Clara, et le conseil de mise en avant du CV.
 """
 
 
 class LetterDraft(BaseModel):
     letter_text: str
     uncertain_elements: list[str] = []
+    cv_emphasis_advice: str = ""
 
 
 class GeminiLetterGenerator:

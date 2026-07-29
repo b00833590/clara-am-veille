@@ -27,6 +27,17 @@ def decoded_subject(parsed) -> str:
     return "".join(part.decode(charset or "utf-8") if isinstance(part, bytes) else part for part, charset in parts)
 
 
+def text_body(parsed) -> str:
+    for part in parsed.walk():
+        if part.get_content_type() == "text/plain":
+            return part.get_payload(decode=True).decode("utf-8")
+    raise AssertionError("no text/plain part found")
+
+
+def attachment_filenames(parsed) -> list[str]:
+    return [part.get_filename() for part in parsed.walk() if part.get_filename()]
+
+
 def test_build_draft_message_subject_matches_expected_format():
     letter = LetterDraft(letter_text="Madame, Monsieur,...")
     message = build_draft_message(make_posting(), letter)
@@ -40,8 +51,7 @@ def test_build_draft_message_body_contains_letter_text():
     message = build_draft_message(make_posting(), letter)
 
     parsed = decode_message(message)
-    body = parsed.get_payload(decode=True).decode("utf-8")
-    assert "Madame, Monsieur, corps de la lettre." in body
+    assert "Madame, Monsieur, corps de la lettre." in text_body(parsed)
 
 
 def test_build_draft_message_body_flags_uncertain_elements_when_present():
@@ -49,7 +59,7 @@ def test_build_draft_message_body_flags_uncertain_elements_when_present():
     message = build_draft_message(make_posting(), letter)
 
     parsed = decode_message(message)
-    body = parsed.get_payload(decode=True).decode("utf-8")
+    body = text_body(parsed)
     assert "Nom du recruteur" in body
     assert "Date de début" in body
     assert body.index("Nom du recruteur") < body.index("Corps.")
@@ -60,8 +70,46 @@ def test_build_draft_message_omits_verification_block_when_no_uncertain_elements
     message = build_draft_message(make_posting(), letter)
 
     parsed = decode_message(message)
-    body = parsed.get_payload(decode=True).decode("utf-8")
-    assert "À vérifier" not in body
+    assert "À vérifier" not in text_body(parsed)
+
+
+def test_build_draft_message_body_includes_cv_emphasis_advice_when_present():
+    letter = LetterDraft(letter_text="Corps.", cv_emphasis_advice="Mets en avant l'expérience Castignac.")
+    message = build_draft_message(make_posting(), letter)
+
+    parsed = decode_message(message)
+    assert "Mets en avant l'expérience Castignac." in text_body(parsed)
+
+
+def test_build_draft_message_always_attaches_the_letter_as_pdf():
+    letter = LetterDraft(letter_text="Corps de la lettre.")
+    message = build_draft_message(make_posting(), letter)
+
+    parsed = decode_message(message)
+    filenames = attachment_filenames(parsed)
+    assert any(name.endswith(".pdf") and "Lettre" in name for name in filenames)
+
+
+def test_build_draft_message_attaches_the_unmodified_cv_pdf_when_provided():
+    letter = LetterDraft(letter_text="Corps.")
+    message = build_draft_message(make_posting(), letter, cv_pdf_bytes=b"%PDF-1.4 fake cv bytes")
+
+    parsed = decode_message(message)
+    filenames = attachment_filenames(parsed)
+    assert any(name.endswith(".pdf") and "CV" in name for name in filenames)
+
+    for part in parsed.walk():
+        if part.get_filename() and "CV" in part.get_filename():
+            assert part.get_payload(decode=True) == b"%PDF-1.4 fake cv bytes"
+
+
+def test_build_draft_message_omits_cv_attachment_when_not_provided():
+    letter = LetterDraft(letter_text="Corps.")
+    message = build_draft_message(make_posting(), letter, cv_pdf_bytes=None)
+
+    parsed = decode_message(message)
+    filenames = attachment_filenames(parsed)
+    assert not any("CV" in name for name in filenames)
 
 
 class FakeDraftsResource:
@@ -108,3 +156,16 @@ def test_create_draft_calls_gmail_drafts_create_and_returns_draft_id():
     sent = service.users().drafts().created_calls[0]
     assert sent["userId"] == "me"
     assert "raw" in sent["body"]["message"]
+
+
+def test_create_draft_passes_through_configured_cv_pdf_bytes():
+    service = FakeGmailService()
+    creator = GmailDraftCreator(service, cv_pdf_bytes=b"%PDF-1.4 fake cv bytes")
+    letter = LetterDraft(letter_text="Corps.")
+
+    creator.create_draft(make_posting(), letter)
+
+    raw_message = service.users().drafts().created_calls[0]["body"]
+    parsed = decode_message(raw_message)
+    filenames = attachment_filenames(parsed)
+    assert any("CV" in name for name in filenames)

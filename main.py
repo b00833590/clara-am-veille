@@ -21,6 +21,7 @@ ROOT = Path(__file__).parent
 DB_PATH = ROOT / "data" / "offres.db"
 EXCEL_EXPORT_PATH = ROOT / "data" / "offres.xlsx"
 CV_PATH = ROOT / "data" / "cv.txt"
+CV_PDF_PATH = ROOT / "data" / "cv.pdf"
 REFERENCE_LETTER_PATH = ROOT / "data" / "reference_letter.txt"
 CLIENT_SECRET_PATH = ROOT / "client_secret.json"
 TOKEN_PATH = ROOT / "token.json"
@@ -42,7 +43,12 @@ def main() -> None:
         cv_text=CV_PATH.read_text(encoding="utf-8"),
         reference_letter_text=REFERENCE_LETTER_PATH.read_text(encoding="utf-8"),
     )
-    draft_creator = GmailDraftCreator(gmail_service)
+    if CV_PDF_PATH.exists():
+        cv_pdf_bytes = CV_PDF_PATH.read_bytes()
+    else:
+        cv_pdf_bytes = None
+        print(f"Attention : {CV_PDF_PATH} introuvable — les brouillons de lettres n'auront pas le CV en pièce jointe.")
+    draft_creator = GmailDraftCreator(gmail_service, cv_pdf_bytes=cv_pdf_bytes)
 
     sources = active_sources()
     summary = run_polling_pass(sources, repository, classifier, notifier, letter_generator, draft_creator)

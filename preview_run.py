@@ -19,6 +19,7 @@ from src.classification.rule_based_classifier import RuleBasedClassifier
 from src.config import active_sources, pending_sources
 from src.generation.gemini_letter_generator import GeminiLetterGenerator, LetterDraft
 from src.models import JobPosting
+from src.notifications.gmail_draft import build_draft_message
 from src.orchestrator import retry_missing_letters, run_polling_pass
 from src.storage.excel_export import export_to_excel
 from src.storage.sqlite_repository import SQLiteJobRepository
@@ -27,6 +28,7 @@ ROOT = Path(__file__).parent
 DB_PATH = ROOT / "data" / "offres_preview.db"
 EXCEL_EXPORT_PATH = ROOT / "data" / "offres_preview.xlsx"
 CV_PATH = ROOT / "data" / "cv.txt"
+CV_PDF_PATH = ROOT / "data" / "cv.pdf"
 REFERENCE_LETTER_PATH = ROOT / "data" / "reference_letter.txt"
 
 
@@ -36,8 +38,18 @@ class DryRunNotifier:
 
 
 class DryRunDraftCreator:
+    """Builds the real dossier (letter PDF + CV attachment) to exercise that
+    code path for real, just skips the actual Gmail API call — so a broken
+    PDF/attachment assembly shows up here before Clara's real OAuth run.
+    """
+
+    def __init__(self, cv_pdf_bytes: bytes | None = None):
+        self._cv_pdf_bytes = cv_pdf_bytes
+
     def create_draft(self, posting: JobPosting, letter: LetterDraft) -> str:
-        print(f"  [brouillon Gmail à blanc, pas de dépôt réel] {posting.company} — {posting.title}")
+        message = build_draft_message(posting, letter, self._cv_pdf_bytes)
+        size_kb = len(message["message"]["raw"]) / 1024
+        print(f"  [brouillon Gmail à blanc, pas de dépôt réel] {posting.company} — {posting.title} ({size_kb:.0f} Ko assemblés)")
         return "preview-no-gmail"
 
 
@@ -54,10 +66,13 @@ def main() -> None:
         reference_letter_text=REFERENCE_LETTER_PATH.read_text(encoding="utf-8"),
     )
 
+    cv_pdf_bytes = CV_PDF_PATH.read_bytes() if CV_PDF_PATH.exists() else None
+    draft_creator = DryRunDraftCreator(cv_pdf_bytes)
+
     sources = active_sources()
     print(f"Sources actives interrogées : {len(sources)}")
 
-    summary = run_polling_pass(sources, repository, classifier, DryRunNotifier(), letter_generator, DryRunDraftCreator())
+    summary = run_polling_pass(sources, repository, classifier, DryRunNotifier(), letter_generator, draft_creator)
 
     print(f"\nNouvelles offres détectées et classées : {len(summary.new_postings)}")
     for posting in summary.new_postings:
@@ -72,7 +87,7 @@ def main() -> None:
     pending = pending_sources()
     print(f"\nSources en attente de connecteur ({len(pending)}/{len(pending) + len(sources)})")
 
-    retry_summary = retry_missing_letters(repository, letter_generator, DryRunDraftCreator())
+    retry_summary = retry_missing_letters(repository, letter_generator, draft_creator)
     if retry_summary.new_postings:
         print(f"\nLettres générées pour des offres déjà connues (échec précédent) : {len(retry_summary.new_postings)}")
         for posting in retry_summary.new_postings:
