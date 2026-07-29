@@ -1,0 +1,24 @@
+.env
+client_secret.json
+token.json
+CLAUDE.md
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/
+logs/
+
+# Artefacts de debug/investigation ad hoc, jamais des fichiers du projet
+axa_*.json
+gs_links.txt
+gs_requests.json
+jobvite_full.html
+jt_links.txt
+preview_export.json
+
+# Outils locaux, sans rapport avec le projet lui-même
+.claude/
+graphify-out/
+.coverage
+.pytest_cache/

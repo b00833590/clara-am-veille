@@ -1,0 +1,12 @@
+[Unit]
+Description=Déclenche clara-am-validate.service une fois par jour
+
+[Timer]
+# Décalé de 04:15 (hors des créneaux clara-am-baseline à 00/03/06h) pour ne
+# jamais faire tourner les deux pipelines en même temps sans raison.
+OnCalendar=*-*-* 04:15:00
+Persistent=true
+Unit=clara-am-validate.service
+
+[Install]
+WantedBy=timers.target

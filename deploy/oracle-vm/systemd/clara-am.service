@@ -1,0 +1,11 @@
+[Unit]
+Description=Veille stages AM — scraping + classification + notifications + brouillons de lettres
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/clara-am
+ExecStart=/opt/clara-am/deploy/run.sh main.py
+# Correspond à l'ExecutionTimeLimit PT45M de l'ancienne tâche Windows.
+TimeoutStartSec=2700

@@ -1,0 +1,86 @@
+name: Veille stages AM
+
+# Horaires en UTC — Europe/Paris est actuellement UTC+2 (heure d'été, CEST).
+# Ces cron ne suivent PAS le changement d'heure automatiquement : entre fin
+# octobre et fin mars (UTC+1, CET), tout se décale d'1h plus tard côté Paris
+# (ex. le run visant 8h Paris arrivera à 9h). Impact mineur pour ce projet —
+# ajuster les heures ci-dessous de ±1 si besoin de précision saisonnière.
+on:
+  schedule:
+    # Toutes les 3h en continu (couvre nuits et week-ends) — Paris 00,03,06,09,12,15,18,21
+    - cron: "0 22,1,4,7,10,13,16,19 * * *"
+    # Toutes les heures, 8h-22h en semaine — Paris 08..22
+    - cron: "0 6-20 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      seed_from_secret:
+        description: "Amorcer data/offres.db depuis le secret SEED_OFFRES_DB (premier run uniquement)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offres-db-state
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Restaurer la base de données (cache Actions, jamais committée)
+        uses: actions/cache/restore@v4
+        with:
+          path: data/offres.db
+          key: offres-db-${{ github.run_id }}
+          restore-keys: |
+            offres-db-
+
+      - name: Amorcer la base au tout premier run
+        if: ${{ github.event.inputs.seed_from_secret == 'true' }}
+        env:
+          SEED_OFFRES_DB: ${{ secrets.SEED_OFFRES_DB }}
+        run: |
+          mkdir -p data
+          if [ -n "$SEED_OFFRES_DB" ]; then
+            printf '%s' "$SEED_OFFRES_DB" | base64 -d > data/offres.db
+            echo "Base amorcée depuis SEED_OFFRES_DB ($(stat -c%s data/offres.db) octets)."
+          fi
+
+      - name: Restaurer les secrets (identifiants, CV, lettre de référence)
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+          CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON }}
+          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+          CV_TXT: ${{ secrets.CV_TXT }}
+          REFERENCE_LETTER_TXT: ${{ secrets.REFERENCE_LETTER_TXT }}
+        run: |
+          mkdir -p data
+          printf '%s' "$ENV_FILE" > .env
+          printf '%s' "$CLIENT_SECRET_JSON" > client_secret.json
+          printf '%s' "$TOKEN_JSON" > token.json
+          printf '%s' "$CV_TXT" > data/cv.txt
+          printf '%s' "$REFERENCE_LETTER_TXT" > data/reference_letter.txt
+
+      - name: Lancer le pipeline
+        run: python main.py
+
+      - name: Sauvegarder la base de données mise à jour
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/offres.db
+          key: offres-db-${{ github.run_id }}

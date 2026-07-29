@@ -1,0 +1,48 @@
+name: Validation des offres expirées
+
+# Sweep séparé du pipeline principal (voir CLAUDE.md) — re-teste les URLs des
+# offres encore "Nouvelle" une fois par jour, pas à chaque run, par politesse
+# envers les sites cibles.
+on:
+  schedule:
+    - cron: "15 2 * * *" # 04h15 Europe/Paris (UTC+2, voir note DST dans veille.yml)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offres-db-state
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Restaurer la base de données (cache Actions, jamais committée)
+        uses: actions/cache/restore@v4
+        with:
+          path: data/offres.db
+          key: offres-db-${{ github.run_id }}
+          restore-keys: |
+            offres-db-
+
+      - name: Lancer le sweep de validation
+        run: python scripts/validate_offers.py
+
+      - name: Sauvegarder la base de données mise à jour
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/offres.db
+          key: offres-db-${{ github.run_id }}

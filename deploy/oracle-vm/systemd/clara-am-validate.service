@@ -1,0 +1,10 @@
+[Unit]
+Description=Sweep de validation des offres expirées (scripts/validate_offers.py)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/clara-am
+ExecStart=/opt/clara-am/deploy/run.sh scripts/validate_offers.py
+TimeoutStartSec=1800
