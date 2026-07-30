@@ -1,0 +1,43 @@
+name: (temporaire) Reclassifier la base existante
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offres-db-state
+  cancel-in-progress: false
+
+jobs:
+  reclassify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: pip install pydantic
+
+      - name: Restaurer la base de données (cache Actions, jamais committée)
+        uses: actions/cache/restore@v4
+        with:
+          path: data/offres.db
+          key: offres-db-${{ github.run_id }}
+          restore-keys: |
+            offres-db-
+
+      - name: Reclassifier les offres déjà stockées
+        run: python scripts/reclassify_existing.py
+
+      - name: Sauvegarder la base de données mise à jour
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/offres.db
+          key: offres-db-${{ github.run_id }}

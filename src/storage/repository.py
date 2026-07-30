@@ -27,3 +27,8 @@ class JobRepository(ABC):
         (Phase 4) — distinct from `status`, the system-managed posting
         lifecycle field. Default no-op for implementations that don't track
         these."""
+
+    def update_classification(self, stable_id: str, category: str, language: str, to_verify: bool, classification_reason: str) -> None:
+        """Re-applies a classifier decision to an already-stored posting —
+        used for one-off catch-up passes after a classifier rule change.
+        Default no-op for implementations that don't need this."""

@@ -122,6 +122,21 @@ class SQLiteJobRepository(JobRepository):
             )
             conn.commit()
 
+    def update_classification(self, stable_id: str, category: str, language: str, to_verify: bool, classification_reason: str) -> None:
+        """Used by scripts/reclassify_existing.py — a one-off pass to catch
+        already-stored postings up to date after a classifier rule change,
+        e.g. the 2026-07-30 keyword fix (M&A/IB, contrôleur financier,
+        team assistant... were previously falling through to a false-
+        positive A default). Never touches cover_letter_link/status/
+        application_* — a re-run of an existing letter or a manual status
+        Clara already set are left alone."""
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE postings SET category = ?, language = ?, to_verify = ?, classification_reason = ? WHERE stable_id = ?",
+                (category, language, int(to_verify), classification_reason, stable_id),
+            )
+            conn.commit()
+
     def update_tracking_fields(self, stable_id: str, application_status: str, application_date: str, follow_up_date: str, notes: str) -> None:
         """Clara-owned columns (see src/tracking/sheets_sync.py) — the Google
         Sheet is their source of truth, so a sync always overwrites these
