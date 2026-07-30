@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from src.notifications.gmail_auth import get_gmail_service
+from src.notifications.gmail_auth import get_gmail_service, get_sheets_service
 
 
 def test_get_gmail_service_reuses_valid_cached_token_without_interactive_flow(tmp_path, monkeypatch):
@@ -41,3 +41,24 @@ def test_get_gmail_service_runs_interactive_flow_when_no_cached_token(tmp_path, 
     assert service == "fake-service"
     flow_mock.from_client_secrets_file.assert_called_once()
     assert token_path.exists()
+
+
+def test_get_sheets_service_reuses_the_same_cached_token_as_gmail(tmp_path, monkeypatch):
+    token_path = tmp_path / "token.json"
+    token_path.write_text('{"fake": "token"}')
+
+    fake_creds = MagicMock(valid=True)
+    monkeypatch.setattr(
+        "src.notifications.gmail_auth.Credentials.from_authorized_user_file",
+        lambda *args, **kwargs: fake_creds,
+    )
+    build_mock = MagicMock(return_value="fake-sheets-service")
+    monkeypatch.setattr("src.notifications.gmail_auth.build", build_mock)
+    flow_mock = MagicMock()
+    monkeypatch.setattr("src.notifications.gmail_auth.InstalledAppFlow", flow_mock)
+
+    service = get_sheets_service(tmp_path / "client_secret.json", token_path)
+
+    assert service == "fake-sheets-service"
+    flow_mock.from_client_secrets_file.assert_not_called()
+    build_mock.assert_called_once_with("sheets", "v4", credentials=fake_creds)

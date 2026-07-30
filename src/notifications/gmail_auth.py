@@ -7,16 +7,18 @@ from googleapiclient.discovery import build
 
 # gmail.send : notifications de nouvelles offres (Phase 2)
 # gmail.compose : dépôt des brouillons de lettres (Phase 3)
+# spreadsheets : synchronisation du tableau de suivi (Phase 4)
 # Demandés ensemble pour que Clara n'ait à passer par l'écran de consentement
-# qu'une seule fois. Les deux scopes doivent être ajoutés côté Google Auth
+# qu'une seule fois. Les trois scopes doivent être ajoutés côté Google Auth
 # platform → Data Access avant le premier lancement (voir CLAUDE.md).
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/spreadsheets",
 ]
 
 
-def get_gmail_service(client_secret_path: Path, token_path: Path):
+def _get_credentials(client_secret_path: Path, token_path: Path) -> Credentials:
     creds = _load_credentials(token_path)
 
     if not creds or not creds.valid:
@@ -27,7 +29,15 @@ def get_gmail_service(client_secret_path: Path, token_path: Path):
             creds = flow.run_local_server(port=0)
         token_path.write_text(creds.to_json())
 
-    return build("gmail", "v1", credentials=creds)
+    return creds
+
+
+def get_gmail_service(client_secret_path: Path, token_path: Path):
+    return build("gmail", "v1", credentials=_get_credentials(client_secret_path, token_path))
+
+
+def get_sheets_service(client_secret_path: Path, token_path: Path):
+    return build("sheets", "v4", credentials=_get_credentials(client_secret_path, token_path))
 
 
 def _load_credentials(token_path: Path) -> Credentials | None:

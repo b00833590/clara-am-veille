@@ -21,3 +21,9 @@ class JobRepository(ABC):
         this (e.g. the legacy Excel repository, no longer the source of
         truth)."""
         return []
+
+    def update_tracking_fields(self, stable_id: str, application_status: str, application_date: str, follow_up_date: str, notes: str) -> None:
+        """Clara-owned tracking columns synced back from the Google Sheet
+        (Phase 4) — distinct from `status`, the system-managed posting
+        lifecycle field. Default no-op for implementations that don't track
+        these."""

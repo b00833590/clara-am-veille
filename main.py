@@ -10,12 +10,13 @@ from dotenv import load_dotenv
 from src.classification.rule_based_classifier import RuleBasedClassifier
 from src.config import active_sources, pending_sources
 from src.generation.gemini_letter_generator import GeminiLetterGenerator
-from src.notifications.gmail_auth import get_gmail_service
+from src.notifications.gmail_auth import get_gmail_service, get_sheets_service
 from src.notifications.gmail_draft import GmailDraftCreator
 from src.notifications.gmail_notifier import GmailNotifier
 from src.orchestrator import retry_missing_letters, run_polling_pass
 from src.storage.excel_export import export_to_excel
 from src.storage.sqlite_repository import SQLiteJobRepository
+from src.tracking.sheets_sync import SheetsSync
 
 ROOT = Path(__file__).parent
 DB_PATH = ROOT / "data" / "offres.db"
@@ -83,6 +84,14 @@ def main() -> None:
     export_to_excel(repository, EXCEL_EXPORT_PATH)
     print(f"Base de données : {DB_PATH}")
     print(f"Fichier de suivi (export lecture seule) : {EXCEL_EXPORT_PATH}")
+
+    spreadsheet_id = os.environ.get("SPREADSHEET_ID")
+    if spreadsheet_id:
+        sheets_service = get_sheets_service(CLIENT_SECRET_PATH, TOKEN_PATH)
+        SheetsSync(sheets_service, spreadsheet_id).sync(repository)
+        print("Tableau de suivi Google Sheets synchronisé.")
+    else:
+        print("SPREADSHEET_ID non configuré — synchronisation Google Sheets ignorée.")
 
 
 if __name__ == "__main__":

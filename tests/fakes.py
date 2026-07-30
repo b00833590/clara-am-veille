@@ -17,6 +17,7 @@ class InMemoryJobRepository(JobRepository):
     def __init__(self):
         self._seen: dict[str, JobPosting] = {}
         self.letters: dict[str, str] = {}
+        self.tracking: dict[str, dict] = {}
 
     def exists(self, stable_id: str) -> bool:
         return stable_id in self._seen
@@ -33,3 +34,11 @@ class InMemoryJobRepository(JobRepository):
             for stable_id, posting in self._seen.items()
             if posting.category == category and not self.letters.get(stable_id)
         ]
+
+    def update_tracking_fields(self, stable_id: str, application_status: str, application_date: str, follow_up_date: str, notes: str) -> None:
+        self.tracking[stable_id] = {
+            "application_status": application_status,
+            "application_date": application_date,
+            "follow_up_date": follow_up_date,
+            "notes": notes,
+        }

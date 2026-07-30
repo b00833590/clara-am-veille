@@ -169,3 +169,84 @@ def test_exists_check_does_not_full_scan_every_row(tmp_path):
     plan_text = " ".join(str(row) for row in plan)
 
     assert "SCAN" not in plan_text.upper()
+
+
+def test_new_postings_have_empty_tracking_fields_by_default(tmp_path):
+    repo = SQLiteJobRepository(tmp_path / "postings.db")
+    posting = make_posting()
+    repo.add(posting)
+
+    row = repo.all_postings()[0]
+
+    assert row["application_status"] == ""
+    assert row["application_date"] == ""
+    assert row["follow_up_date"] == ""
+    assert row["notes"] == ""
+
+
+def test_update_tracking_fields_writes_all_four_columns(tmp_path):
+    repo = SQLiteJobRepository(tmp_path / "postings.db")
+    posting = make_posting()
+    repo.add(posting)
+
+    repo.update_tracking_fields(
+        posting.stable_id(),
+        application_status="Candidature envoyée",
+        application_date="2026-08-01",
+        follow_up_date="2026-08-15",
+        notes="Relancer par téléphone si pas de réponse.",
+    )
+
+    row = repo.all_postings()[0]
+    assert row["status"] == "Nouvelle"  # champ système inchangé
+    assert row["application_status"] == "Candidature envoyée"
+    assert row["application_date"] == "2026-08-01"
+    assert row["follow_up_date"] == "2026-08-15"
+    assert row["notes"] == "Relancer par téléphone si pas de réponse."
+
+
+def test_migration_adds_tracking_columns_to_a_pre_existing_database(tmp_path):
+    # Simulates a database created before Phase 4 (no tracking columns) —
+    # reopening it must add them without losing existing data, exactly the
+    # bug class the Excel migration in Phase 2bis already had to fix once.
+    import sqlite3
+
+    db_path = tmp_path / "legacy.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """
+        CREATE TABLE postings (
+            stable_id TEXT PRIMARY KEY,
+            company TEXT NOT NULL,
+            title TEXT NOT NULL,
+            url TEXT,
+            description TEXT NOT NULL,
+            location TEXT,
+            start_date TEXT,
+            category TEXT,
+            language TEXT,
+            to_verify INTEGER NOT NULL DEFAULT 0,
+            classification_reason TEXT NOT NULL DEFAULT '',
+            location_priority INTEGER NOT NULL DEFAULT 4,
+            status TEXT NOT NULL DEFAULT 'Nouvelle',
+            cover_letter_link TEXT,
+            source_platform TEXT NOT NULL DEFAULT '',
+            detected_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO postings (stable_id, company, title, description, detected_at) VALUES (?, ?, ?, ?, ?)",
+        ("legacy-1", "Amundi", "Ancien poste", "...", "2026-07-01T00:00:00+00:00"),
+    )
+    conn.commit()
+    conn.close()
+
+    repo = SQLiteJobRepository(db_path)
+
+    row = repo.all_postings()[0]
+    assert row["company"] == "Amundi"
+    assert row["application_status"] == ""
+    assert row["application_date"] == ""
+    assert row["follow_up_date"] == ""
+    assert row["notes"] == ""

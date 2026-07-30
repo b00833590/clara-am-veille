@@ -74,9 +74,13 @@ jobs:
           CV_PDF_BASE64_2: ${{ secrets.CV_PDF_BASE64_2 }}
           CV_PDF_BASE64_3: ${{ secrets.CV_PDF_BASE64_3 }}
           REFERENCE_LETTER_TXT: ${{ secrets.REFERENCE_LETTER_TXT }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
         run: |
           mkdir -p data
           printf '%s' "$ENV_FILE" > .env
+          if [ -n "$SPREADSHEET_ID" ]; then
+            echo "SPREADSHEET_ID=$SPREADSHEET_ID" >> .env
+          fi
           printf '%s' "$CLIENT_SECRET_JSON" > client_secret.json
           printf '%s' "$TOKEN_JSON" > token.json
           printf '%s' "$CV_TXT" > data/cv.txt
