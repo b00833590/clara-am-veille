@@ -35,10 +35,29 @@ class InMemoryJobRepository(JobRepository):
             if posting.category == category and not self.letters.get(stable_id)
         ]
 
-    def update_tracking_fields(self, stable_id: str, application_status: str, application_date: str, follow_up_date: str, notes: str) -> None:
+    def update_tracking_fields(
+        self,
+        stable_id: str,
+        application_status: str,
+        application_date: str,
+        follow_up_date: str,
+        notes: str,
+        deadline_date: str = "",
+        contact_name: str = "",
+        contact_email: str = "",
+        interest_level: str = "",
+        fit_level: str = "",
+        next_action: str = "",
+    ) -> None:
         self.tracking[stable_id] = {
             "application_status": application_status,
             "application_date": application_date,
             "follow_up_date": follow_up_date,
             "notes": notes,
+            "deadline_date": deadline_date,
+            "contact_name": contact_name,
+            "contact_email": contact_email,
+            "interest_level": interest_level,
+            "fit_level": fit_level,
+            "next_action": next_action,
         }

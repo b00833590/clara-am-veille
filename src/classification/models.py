@@ -8,3 +8,4 @@ class ClassificationResult(BaseModel):
     language: str
     to_verify: bool
     reason: str = ""
+    team_division: str = ""

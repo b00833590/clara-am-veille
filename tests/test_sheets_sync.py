@@ -16,6 +16,10 @@ def posting(**overrides):
     return JobPosting(**defaults)
 
 
+def _col(rows, row_index, header_name):
+    return rows[row_index][HEADERS.index(header_name)]
+
+
 class FakeExecutable:
     def __init__(self, result):
         self._result = result
@@ -56,6 +60,13 @@ class FakeSheetsService:
         return self._spreadsheets
 
 
+def _empty_row_for(stable_id: str, **fields) -> list[str]:
+    row = {header: "" for header in HEADERS}
+    row["ID"] = stable_id
+    row.update(fields)
+    return [row[header] for header in HEADERS]
+
+
 def test_sync_writes_new_category_a_postings_to_an_empty_sheet(tmp_path):
     repository = SQLiteJobRepository(tmp_path / "postings.db")
     repository.add(posting())
@@ -66,8 +77,23 @@ def test_sync_writes_new_category_a_postings_to_an_empty_sheet(tmp_path):
 
     rows = service.spreadsheets().values().stored_rows
     assert rows[0] == HEADERS
-    assert rows[1][1] == "Amundi"
-    assert rows[1][2] == "Stage Analyste Gestion Actions"
+    assert _col(rows, 1, "Entreprise") == "Amundi"
+    assert _col(rows, 1, "Titre du poste") == "Stage Analyste Gestion Actions"
+    assert _col(rows, 1, "Confiance") == "Confiant"
+    assert int(_col(rows, 1, "Score de pertinence")) > 0
+
+
+def test_sync_populates_division_and_source_from_the_posting(tmp_path):
+    repository = SQLiteJobRepository(tmp_path / "postings.db")
+    repository.add(posting(team_division="Equity", source_platform="SmartRecruiters"))
+    service = FakeSheetsService()
+    sync = SheetsSync(service, "fake-spreadsheet-id")
+
+    sync.sync(repository)
+
+    rows = service.spreadsheets().values().stored_rows
+    assert _col(rows, 1, "Division / Équipe") == "Equity"
+    assert _col(rows, 1, "Source") == "SmartRecruiters"
 
 
 def test_sync_excludes_off_topic_postings_from_the_sheet(tmp_path):
@@ -88,7 +114,21 @@ def test_sync_pulls_claras_manual_edits_into_the_repository(tmp_path):
     repository.add(a_posting)
     existing_sheet_rows = [
         HEADERS,
-        [a_posting.stable_id(), "Amundi", "Stage Analyste Gestion Actions", "Paris, France", "...", a_posting.url, "Entretien", "2026-08-01", "2026-08-15", "Relancer par tel."],
+        _empty_row_for(
+            a_posting.stable_id(),
+            **{
+                "Statut": "Entretien",
+                "Date de candidature": "2026-08-01",
+                "Prochaine relance": "2026-08-15",
+                "Commentaires": "Relancer par tel.",
+                "Date limite candidature": "2026-08-20",
+                "Contact / Recruteur": "Jean Dupont",
+                "Email contact": "jean.dupont@amundi.com",
+                "Niveau d'intérêt": "Élevé",
+                "Adéquation profil": "Bonne",
+                "Prochaine action": "Envoyer email de relance",
+            },
+        ),
     ]
     service = FakeSheetsService(existing_sheet_rows)
     sync = SheetsSync(service, "fake-spreadsheet-id")
@@ -100,6 +140,12 @@ def test_sync_pulls_claras_manual_edits_into_the_repository(tmp_path):
     assert stored["application_date"] == "2026-08-01"
     assert stored["follow_up_date"] == "2026-08-15"
     assert stored["notes"] == "Relancer par tel."
+    assert stored["deadline_date"] == "2026-08-20"
+    assert stored["contact_name"] == "Jean Dupont"
+    assert stored["contact_email"] == "jean.dupont@amundi.com"
+    assert stored["interest_level"] == "Élevé"
+    assert stored["fit_level"] == "Bonne"
+    assert stored["next_action"] == "Envoyer email de relance"
 
 
 def test_sync_never_overwrites_the_system_managed_status_column(tmp_path):
@@ -108,7 +154,7 @@ def test_sync_never_overwrites_the_system_managed_status_column(tmp_path):
     repository.add(a_posting)
     existing_sheet_rows = [
         HEADERS,
-        [a_posting.stable_id(), "Amundi", "Stage Analyste Gestion Actions", "Paris, France", "...", a_posting.url, "Entretien", "", "", ""],
+        _empty_row_for(a_posting.stable_id(), **{"Statut": "Entretien"}),
     ]
     service = FakeSheetsService(existing_sheet_rows)
     sync = SheetsSync(service, "fake-spreadsheet-id")
@@ -127,7 +173,14 @@ def test_sync_roundtrips_claras_edits_back_into_the_regenerated_sheet(tmp_path):
     repository.add(a_posting)
     existing_sheet_rows = [
         HEADERS,
-        [a_posting.stable_id(), "Amundi", "Stage Analyste Gestion Actions", "Paris, France", "...", a_posting.url, "Candidature envoyée", "2026-08-01", "", "À suivre"],
+        _empty_row_for(
+            a_posting.stable_id(),
+            **{
+                "Statut": "Candidature envoyée",
+                "Date de candidature": "2026-08-01",
+                "Commentaires": "À suivre",
+            },
+        ),
     ]
     service = FakeSheetsService(existing_sheet_rows)
     sync = SheetsSync(service, "fake-spreadsheet-id")
@@ -135,10 +188,9 @@ def test_sync_roundtrips_claras_edits_back_into_the_regenerated_sheet(tmp_path):
     sync.sync(repository)
 
     rows = service.spreadsheets().values().stored_rows
-    written_row = rows[1]
-    assert written_row[6] == "Candidature envoyée"
-    assert written_row[7] == "2026-08-01"
-    assert written_row[9] == "À suivre"
+    assert _col(rows, 1, "Statut") == "Candidature envoyée"
+    assert _col(rows, 1, "Date de candidature") == "2026-08-01"
+    assert _col(rows, 1, "Commentaires") == "À suivre"
 
 
 def test_sync_ignores_sheet_rows_missing_an_id():
@@ -149,7 +201,7 @@ def test_sync_ignores_sheet_rows_missing_an_id():
         def all_postings(self):
             return []
 
-    existing_sheet_rows = [HEADERS, ["", "Une entreprise sans ID valide", "", "", "", "", "", "", "", ""]]
+    existing_sheet_rows = [HEADERS, _empty_row_for("")]
     service = FakeSheetsService(existing_sheet_rows)
     sync = SheetsSync(service, "fake-spreadsheet-id")
 

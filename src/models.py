@@ -15,6 +15,7 @@ class JobPosting:
     language: str | None = None
     to_verify: bool = False
     classification_reason: str = ""
+    team_division: str = ""
     location_priority: int = 4
     status: str = "Nouvelle"
     cover_letter_link: str | None = None

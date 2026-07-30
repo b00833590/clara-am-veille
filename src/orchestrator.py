@@ -95,6 +95,7 @@ def _process_posting(
         language=result.language,
         to_verify=result.to_verify,
         classification_reason=result.reason,
+        team_division=result.team_division,
         location_priority=location_priority(posting.location),
     )
 

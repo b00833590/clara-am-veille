@@ -26,7 +26,14 @@ CREATE TABLE IF NOT EXISTS postings (
     application_status TEXT NOT NULL DEFAULT '',
     application_date TEXT NOT NULL DEFAULT '',
     follow_up_date TEXT NOT NULL DEFAULT '',
-    notes TEXT NOT NULL DEFAULT ''
+    notes TEXT NOT NULL DEFAULT '',
+    team_division TEXT NOT NULL DEFAULT '',
+    deadline_date TEXT NOT NULL DEFAULT '',
+    contact_name TEXT NOT NULL DEFAULT '',
+    contact_email TEXT NOT NULL DEFAULT '',
+    interest_level TEXT NOT NULL DEFAULT '',
+    fit_level TEXT NOT NULL DEFAULT '',
+    next_action TEXT NOT NULL DEFAULT ''
 );
 """
 
@@ -47,6 +54,16 @@ _MIGRATION_COLUMNS = {
     "application_date": "TEXT NOT NULL DEFAULT ''",
     "follow_up_date": "TEXT NOT NULL DEFAULT ''",
     "notes": "TEXT NOT NULL DEFAULT ''",
+    # Phase 4bis (2026-07-30) — richer tracking sheet. team_division is
+    # system-derived (src/classification/division.py); the rest are Clara-
+    # owned, synced back from the sheet exactly like the columns above.
+    "team_division": "TEXT NOT NULL DEFAULT ''",
+    "deadline_date": "TEXT NOT NULL DEFAULT ''",
+    "contact_name": "TEXT NOT NULL DEFAULT ''",
+    "contact_email": "TEXT NOT NULL DEFAULT ''",
+    "interest_level": "TEXT NOT NULL DEFAULT ''",
+    "fit_level": "TEXT NOT NULL DEFAULT ''",
+    "next_action": "TEXT NOT NULL DEFAULT ''",
 }
 
 
@@ -82,8 +99,8 @@ class SQLiteJobRepository(JobRepository):
                 INSERT OR IGNORE INTO postings (
                     stable_id, company, title, url, description, location, start_date,
                     category, language, to_verify, classification_reason, location_priority,
-                    status, cover_letter_link, source_platform, detected_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    status, cover_letter_link, source_platform, detected_at, team_division
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     posting.stable_id(),
@@ -102,6 +119,7 @@ class SQLiteJobRepository(JobRepository):
                     posting.cover_letter_link,
                     posting.source_platform,
                     posting.detected_at.isoformat(),
+                    posting.team_division,
                 ),
             )
             conn.commit()
@@ -122,7 +140,7 @@ class SQLiteJobRepository(JobRepository):
             )
             conn.commit()
 
-    def update_classification(self, stable_id: str, category: str, language: str, to_verify: bool, classification_reason: str) -> None:
+    def update_classification(self, stable_id: str, category: str, language: str, to_verify: bool, classification_reason: str, team_division: str = "") -> None:
         """Used by scripts/reclassify_existing.py — a one-off pass to catch
         already-stored postings up to date after a classifier rule change,
         e.g. the 2026-07-30 keyword fix (M&A/IB, contrôleur financier,
@@ -132,12 +150,25 @@ class SQLiteJobRepository(JobRepository):
         Clara already set are left alone."""
         with self._connect() as conn:
             conn.execute(
-                "UPDATE postings SET category = ?, language = ?, to_verify = ?, classification_reason = ? WHERE stable_id = ?",
-                (category, language, int(to_verify), classification_reason, stable_id),
+                "UPDATE postings SET category = ?, language = ?, to_verify = ?, classification_reason = ?, team_division = ? WHERE stable_id = ?",
+                (category, language, int(to_verify), classification_reason, team_division, stable_id),
             )
             conn.commit()
 
-    def update_tracking_fields(self, stable_id: str, application_status: str, application_date: str, follow_up_date: str, notes: str) -> None:
+    def update_tracking_fields(
+        self,
+        stable_id: str,
+        application_status: str,
+        application_date: str,
+        follow_up_date: str,
+        notes: str,
+        deadline_date: str = "",
+        contact_name: str = "",
+        contact_email: str = "",
+        interest_level: str = "",
+        fit_level: str = "",
+        next_action: str = "",
+    ) -> None:
         """Clara-owned columns (see src/tracking/sheets_sync.py) — the Google
         Sheet is their source of truth, so a sync always overwrites these
         with exactly what's in the sheet, blank cells included, rather than
@@ -145,8 +176,19 @@ class SQLiteJobRepository(JobRepository):
         system-managed posting lifecycle field (Nouvelle/Expirée)."""
         with self._connect() as conn:
             conn.execute(
-                "UPDATE postings SET application_status = ?, application_date = ?, follow_up_date = ?, notes = ? WHERE stable_id = ?",
-                (application_status, application_date, follow_up_date, notes, stable_id),
+                """
+                UPDATE postings SET
+                    application_status = ?, application_date = ?, follow_up_date = ?, notes = ?,
+                    deadline_date = ?, contact_name = ?, contact_email = ?,
+                    interest_level = ?, fit_level = ?, next_action = ?
+                WHERE stable_id = ?
+                """,
+                (
+                    application_status, application_date, follow_up_date, notes,
+                    deadline_date, contact_name, contact_email,
+                    interest_level, fit_level, next_action,
+                    stable_id,
+                ),
             )
             conn.commit()
 
@@ -189,6 +231,7 @@ def _posting_from_row(row: dict) -> JobPosting:
         language=row["language"],
         to_verify=bool(row["to_verify"]),
         classification_reason=row["classification_reason"],
+        team_division=row["team_division"],
         location_priority=row["location_priority"],
         status=row["status"],
         cover_letter_link=row["cover_letter_link"],

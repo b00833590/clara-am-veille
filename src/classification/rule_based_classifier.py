@@ -1,5 +1,6 @@
 import re
 
+from src.classification.division import infer_division
 from src.classification.models import ClassificationResult
 from src.models import JobPosting
 
@@ -98,6 +99,7 @@ class RuleBasedClassifier:
 
     def classify(self, posting: JobPosting) -> ClassificationResult:
         haystack = f"{posting.title} {posting.description}"
+        division = infer_division(posting.title, posting.description)
 
         language = _detect_language(haystack)
         language_uncertain = language is None
@@ -111,22 +113,22 @@ class RuleBasedClassifier:
         if esg_mentioned:
             category = "A" if included else "N"
             reason = _REASON_ESG_WITH_AM if included else _REASON_ESG_STANDALONE
-            return self._result(category, language, True, reason, language_uncertain)
+            return self._result(category, language, True, reason, language_uncertain, division)
 
         if excluded and included:
-            return self._result("N", language, True, _REASON_CONFLICTING, language_uncertain)
+            return self._result("N", language, True, _REASON_CONFLICTING, language_uncertain, division)
 
         if excluded:
-            return self._result("N", language, False, _REASON_EXCLUDED, language_uncertain)
+            return self._result("N", language, False, _REASON_EXCLUDED, language_uncertain, division)
 
         if included:
-            return self._result("A", language, False, _REASON_INCLUDED, language_uncertain)
+            return self._result("A", language, False, _REASON_INCLUDED, language_uncertain, division)
 
-        return self._result("A", language, True, _REASON_NO_SIGNAL, language_uncertain)
+        return self._result("A", language, True, _REASON_NO_SIGNAL, language_uncertain, division)
 
     @staticmethod
-    def _result(category: str, language: str, to_verify: bool, reason: str, language_uncertain: bool) -> ClassificationResult:
+    def _result(category: str, language: str, to_verify: bool, reason: str, language_uncertain: bool, division: str) -> ClassificationResult:
         if language_uncertain:
             to_verify = True
             reason = reason + _REASON_LANGUAGE_UNCERTAIN_SUFFIX
-        return ClassificationResult(category=category, language=language, to_verify=to_verify, reason=reason)
+        return ClassificationResult(category=category, language=language, to_verify=to_verify, reason=reason, team_division=division)
