@@ -55,10 +55,11 @@ def main() -> None:
     summary = run_polling_pass(sources, repository, classifier, notifier, letter_generator, draft_creator)
 
     print(f"Sources actives interrogées : {len(sources)}")
-    print(f"Nouvelles offres détectées, classées et notifiées : {len(summary.new_postings)}")
+    confidently_matched = [p for p in summary.new_postings if p.category == "A" and not p.to_verify]
+    print(f"Nouvelles offres détectées et classées : {len(summary.new_postings)} (dont {len(confidently_matched)} notifiée(s) par email)")
     for posting in summary.new_postings:
-        flag = " [À VÉRIFIER]" if posting.to_verify else ""
-        letter_note = " — brouillon de lettre déposé dans Gmail" if posting.category == "A" else ""
+        flag = " [À VÉRIFIER — non notifiée, voir le tableau de suivi]" if posting.to_verify else ""
+        letter_note = " — brouillon de lettre déposé dans Gmail" if posting.category == "A" and not posting.to_verify else ""
         print(f"  - [{posting.company}] ({posting.category}){flag} {posting.title} -> {posting.url}{letter_note}")
 
     if summary.errors:

@@ -52,6 +52,11 @@ def classify(title, description=""):
         # despite its sales-adjacent tone — now a confident match, not a
         # "no signal" default.
         ("Stage H/F - Développement Gestion Privée – Paris – Janvier 2027", "A", "fr"),
+        # Found propagating the fix to production the same day: "juriste"
+        # (noun) wasn't caught by "juridique"/"legal", and "contrôleur des
+        # risques" (noun form) wasn't caught by "contrôle des risques".
+        ("Stage H/F – Juriste Corporate - Juillet 2027", "N", "fr"),
+        ("Stage H/F - Analyste Contrôleur des Risques – Janvier 2027", "N", "fr"),
     ],
 )
 def test_matches_real_ground_truth_from_live_run(title, expected_category, expected_language):
