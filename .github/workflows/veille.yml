@@ -77,9 +77,9 @@ jobs:
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
         run: |
           mkdir -p data
-          printf '%s' "$ENV_FILE" > .env
+          printf '%s\n' "$ENV_FILE" > .env
           if [ -n "$SPREADSHEET_ID" ]; then
-            echo "SPREADSHEET_ID=$SPREADSHEET_ID" >> .env
+            printf 'SPREADSHEET_ID=%s\n' "$SPREADSHEET_ID" >> .env
           fi
           printf '%s' "$CLIENT_SECRET_JSON" > client_secret.json
           printf '%s' "$TOKEN_JSON" > token.json
