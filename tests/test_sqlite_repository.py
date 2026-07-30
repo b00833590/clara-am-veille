@@ -155,6 +155,20 @@ def test_postings_missing_letter_returns_category_a_without_a_letter(tmp_path):
     assert results[0].category == "A"
 
 
+def test_postings_missing_letter_excludes_low_confidence_matches(tmp_path):
+    # to_verify=1 postings are deliberately never given a letter (see
+    # src/orchestrator.py) — this retry must not silently backfill one.
+    repo = SQLiteJobRepository(tmp_path / "postings.db")
+    confident = make_posting(url="https://example.com/1", title="Confident A", category="A", to_verify=False)
+    uncertain = make_posting(url="https://example.com/2", title="Uncertain A", category="A", to_verify=True)
+    repo.add(confident)
+    repo.add(uncertain)
+
+    results = repo.postings_missing_letter()
+
+    assert [p.title for p in results] == ["Confident A"]
+
+
 def test_exists_check_does_not_full_scan_every_row(tmp_path):
     # Regression guard for the Excel-era O(n)-per-call scan: exists() must
     # use an indexed lookup (primary key), not iterate every stored row.

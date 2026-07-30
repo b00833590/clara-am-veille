@@ -141,9 +141,13 @@ class SQLiteJobRepository(JobRepository):
         return [dict(row) for row in rows]
 
     def postings_missing_letter(self, category: str = "A") -> list[JobPosting]:
+        # to_verify=1 postings are deliberately never given a letter (see
+        # src/orchestrator.py — only confident matches get one) — excluded
+        # here too, or this retry would silently undo that on the next run.
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM postings WHERE category = ? AND (cover_letter_link IS NULL OR cover_letter_link = '') "
+                "SELECT * FROM postings WHERE category = ? AND to_verify = 0 "
+                "AND (cover_letter_link IS NULL OR cover_letter_link = '') "
                 "ORDER BY detected_at",
                 (category,),
             ).fetchall()

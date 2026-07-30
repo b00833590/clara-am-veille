@@ -15,31 +15,45 @@ _ESG_PATTERN = re.compile(r"\b(esg|isr|rse|sustainab|durabl)", re.IGNORECASE)
 # day, zero false negatives against that day's real A postings. "Vente"/
 # "sales" and "développement commercial" added when classification went
 # AM-strict (2026-07-29) — Clara wants AM investment roles only, no more
-# finance-adjacent "Catégorie B" safety net.
+# finance-adjacent "Catégorie B" safety net. Corporate finance/M&A/IB,
+# contrôle financier, assistanat, and a broadened "communication" added
+# 2026-07-30 after real false positives got emailed (Lazard M&A/IB
+# internships, "Contrôleur financier", "Team Assistant", "Communication
+# visuelle" — none matched the old exclude list, so they fell through to
+# the "no signal" default and were sent to Clara by mistake).
 _AUTO_EXCLUDE_PATTERN = re.compile(
     r"\b("
-    r"marketing|charg[ée] de com|communication (interne|externe)|"
+    r"marketing|charg[ée] de com|communication|"
     r"ressources humaines|\brh\b|talent acquisition|sourcing (de )?talents?|recruiting|recrutement|"
     r"juridique|\blegal\b|compliance|conformit[ée]|\baml\b|\bkyc\b|"
-    r"audit interne|contr[oô]le de gestion|"
+    r"audit interne|contr[oô]le de gestion|contr[oô]leur financier|financial controller|contr[oô]le financier|"
     r"d[ée]veloppement logiciel|data science|data engineer|data ing[ée]nieur|"
     r"ing[ée]nieur (data|informatique|logiciel|syst[èe]mes?)|intelligence artificielle|"
     r"coordination (op[ée]rationnelle|administrative)|fund dealing|middle[- ]office|"
     r"business development|d[ée]veloppement (commercial|client[èe]le|d'affaires)|"
     r"product management|transformation|strat[ée]gie interne|"
     r"risk management|gestion des risques|contr[oô]le des risques|"
-    r"\bvente\b|\bsales\b|inside sales"
+    r"\bvente\b|\bsales\b|inside sales|"
+    r"m&a|mergers? (and|&) acquisitions?|investment banking|corporate finance|"
+    r"leveraged finance|capital markets|debt advisory|restructuring|\bcoverage\b|"
+    r"team assistant|executive assistant|assistant de direction|office assistant"
     r")\b",
     re.IGNORECASE,
 )
 
-# Strong, unambiguous AM-core signals.
+# Strong, unambiguous AM-core signals. "Gestion privée"/"private banking"/
+# "wealth management" added 2026-07-30 — deliberate choice by Clara despite
+# the sales-adjacent tone, unlike M&A/IB which she wants excluded.
 _AUTO_INCLUDE_PATTERN = re.compile(
     r"\b("
     r"discretionary portfolio management|dpm clients?|gestion de portefeuille|portfolio manage\w*|"
     r"investment analyst|investment specialist|equity research|fixed income analyst|"
     r"fixed income management|gestion obligataire|"
-    r"multi[- ]asset|fund analyst|private equity|asset allocation|buy[- ]side research"
+    r"multi[- ]asset|multi[- ]gestion|fund analyst|private equity|asset allocation|allocation d'actifs|"
+    r"buy[- ]side research|recherche (investissement|actions|cr[ée]dit)|"
+    r"analyste (fonds|financier|investissement|actions|cr[ée]dit)|"
+    r"gestion d'actifs immobiliers|real estate asset management|g[ée]rant immobilier|"
+    r"gestion priv[ée]e|private banking|wealth management"
     r")\b",
     re.IGNORECASE,
 )

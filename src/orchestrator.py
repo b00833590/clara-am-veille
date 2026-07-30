@@ -98,7 +98,18 @@ def _process_posting(
         location_priority=location_priority(posting.location),
     )
 
-    if classified_posting.category != CATEGORY_OFF_TOPIC:
+    # Only a confident keyword match (to_verify=False) triggers an email or a
+    # letter — a "no signal either way" default of category A with
+    # to_verify=True still gets stored (visible in the tracking sheet/Excel
+    # for Clara to glance at) but never emailed. Confirmed live on
+    # 2026-07-30: emailing every to_verify=True A posting let genuine noise
+    # through (M&A/IB internships, "Contrôleur financier", "Team Assistant"
+    # all defaulted to A before the exclude list caught up) and flooded
+    # Clara's inbox — she asked for email to be reserved for confident
+    # Asset Management matches only.
+    is_confident_am_match = classified_posting.category == CATEGORY_TRIGGERING_LETTER_GENERATION and not classified_posting.to_verify
+
+    if is_confident_am_match:
         try:
             notifier.notify_new_posting(classified_posting)
         except Exception as exc:
@@ -108,7 +119,7 @@ def _process_posting(
     repository.add(classified_posting)
     summary.new_postings.append(classified_posting)
 
-    if classified_posting.category == CATEGORY_TRIGGERING_LETTER_GENERATION and letter_generator and draft_creator:
+    if is_confident_am_match and letter_generator and draft_creator:
         _generate_letter(source_name, classified_posting, repository, letter_generator, draft_creator, summary)
 
 

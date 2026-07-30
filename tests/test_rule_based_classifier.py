@@ -39,6 +39,19 @@ def classify(title, description=""):
         # real postings: fell through to the "no signal" bucket and was
         # wrongly defaulted to A — a generalist tech role, not AM.
         ("Stage - Data ingénieur H/F", "N", "fr"),
+        # Found live on 2026-07-30 running the real GitHub Actions pipeline:
+        # all four fell through to the old "no signal" default and were
+        # emailed to Clara by mistake — none of these are Asset Management.
+        ("2027 Q2 - M&A Internship - Frankfurt and Munich", "N", "en"),
+        ("January 2027 - M&A internship - Paris", "N", "en"),
+        ("March 2027 - Investment Banking intern - Real Estate team - Paris", "N", "en"),
+        ("Stage - Contrôleur financier (6/12 mois) H/F", "N", "fr"),
+        ("Intern - EA/Team Assistant", "N", "en"),
+        ("Stage - Communication visuelle – Formation en Epargne Salariale et Retraite  H/F", "N", "fr"),
+        # "Gestion privée" is a deliberate inclusion (Clara's choice, 2026-07-30)
+        # despite its sales-adjacent tone — now a confident match, not a
+        # "no signal" default.
+        ("Stage H/F - Développement Gestion Privée – Paris – Janvier 2027", "A", "fr"),
     ],
 )
 def test_matches_real_ground_truth_from_live_run(title, expected_category, expected_language):
@@ -77,7 +90,6 @@ def test_conflicting_signals_resolve_to_n_and_are_flagged():
     "title",
     [
         "Stage - Projets Amundi Immobilier H/F",
-        "Stage H/F - Développement Gestion Privée – Paris – Janvier 2027",
     ],
 )
 def test_no_strong_signal_either_way_defaults_to_a_and_is_flagged(title):
@@ -87,6 +99,12 @@ def test_no_strong_signal_either_way_defaults_to_a_and_is_flagged(title):
     result = classify(title)
     assert result.category == "A"
     assert result.to_verify is True
+
+
+def test_wealth_management_is_a_confident_inclusion():
+    result = classify("Private Banking Internship - Wealth Management Team")
+    assert result.category == "A"
+    assert result.to_verify is False
 
 
 def test_language_uncertain_defaults_to_french_and_is_flagged():

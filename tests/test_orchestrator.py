@@ -197,6 +197,27 @@ def test_category_a_posting_triggers_letter_generation_and_draft_creation():
     assert summary.errors == []
 
 
+def test_low_confidence_a_posting_is_stored_but_not_notified_or_lettered():
+    # Confirmed live on 2026-07-30: emailing every to_verify=True A posting
+    # (the "no signal either way" default) let real noise through — Clara
+    # asked for email reserved to confident matches only. Low-confidence
+    # postings must still be stored (visible in the tracking sheet/Excel).
+    repository = InMemoryJobRepository()
+    classifier = FakeClassifier(result=ClassificationResult(category="A", language="fr", to_verify=True))
+    notifier = FakeNotifier()
+    letter_generator = FakeLetterGenerator()
+    draft_creator = FakeDraftCreator()
+    sources = [("Comgest", FakeFetcher(postings=[posting()]))]
+
+    summary = run_polling_pass(sources, repository, classifier, notifier, letter_generator, draft_creator)
+
+    assert repository.exists(posting().stable_id())
+    assert len(summary.new_postings) == 1
+    assert notifier.notified == []
+    assert letter_generator.generated_for == []
+    assert draft_creator.created_for == []
+
+
 def test_off_topic_posting_does_not_trigger_letter_generation():
     repository = InMemoryJobRepository()
     classifier = FakeClassifier(result=ClassificationResult(category="N", language="fr", to_verify=False))
