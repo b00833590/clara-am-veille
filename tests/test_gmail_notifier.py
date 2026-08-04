@@ -43,6 +43,33 @@ def test_build_notification_message_sends_to_recipient():
     assert parsed["To"] == "clara@example.com"
 
 
+def test_build_notification_message_subject_flags_to_verify_postings():
+    # to_verify postings are emailed since 2026-08-04 (previously silently
+    # swallowed) but never auto-lettered — the subject prefix is how Clara
+    # tells the two apart without opening the email.
+    posting = JobPosting(
+        company="Amundi",
+        title="Stage Analyste",
+        url="https://jobs.amundi.com/1",
+        description="...",
+        category="A",
+        to_verify=True,
+    )
+    message = build_notification_message(posting, recipient_email="clara@example.com")
+
+    parsed = decode_message(message)
+    subject = decoded_subject(parsed)
+    assert subject.startswith("⚠️ À vérifier —")
+
+
+def test_build_notification_message_subject_has_no_prefix_for_confident_match():
+    message = build_notification_message(make_posting(), recipient_email="clara@example.com")
+
+    parsed = decode_message(message)
+    subject = decoded_subject(parsed)
+    assert subject.startswith("Nouvelle offre stage AM —")
+
+
 def test_build_notification_message_body_includes_classification_reason_when_to_verify():
     posting = JobPosting(
         company="Amundi",

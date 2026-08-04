@@ -99,18 +99,25 @@ def _process_posting(
         location_priority=location_priority(posting.location),
     )
 
-    # Only a confident keyword match (to_verify=False) triggers an email or a
-    # letter — a "no signal either way" default of category A with
-    # to_verify=True still gets stored (visible in the tracking sheet/Excel
-    # for Clara to glance at) but never emailed. Confirmed live on
-    # 2026-07-30: emailing every to_verify=True A posting let genuine noise
-    # through (M&A/IB internships, "Contrôleur financier", "Team Assistant"
-    # all defaulted to A before the exclude list caught up) and flooded
-    # Clara's inbox — she asked for email to be reserved for confident
-    # Asset Management matches only.
-    is_confident_am_match = classified_posting.category == CATEGORY_TRIGGERING_LETTER_GENERATION and not classified_posting.to_verify
+    # Every category-A posting is emailed, confident match or not — the
+    # 2026-07-30 version gated email on a confident match (to_verify=False)
+    # to stop real noise (M&A/IB internships, "Contrôleur financier", "Team
+    # Assistant" defaulting to A before the exclude list caught up). But a
+    # live diagnostic on 2026-08-04 found that gate had overcorrected: with
+    # the keyword lists as they stood, 12/12 genuinely new AM offers between
+    # 2026-07-31 and 2026-08-03 fell into the "no signal" default
+    # (to_verify=True) and were silently never emailed — including clear
+    # AM roles like "Investment Risk Data Analyst" and "Quantitative
+    # Research". Any keyword list will always miss real-world phrasing, so
+    # relying on it to gate *visibility* is too brittle. Visibility (email)
+    # is now unconditional on category; confidence (to_verify) only gates
+    # the *auto-lettered* subset — see build_notification_message, which
+    # already flags to_verify postings in the subject/body so Clara can
+    # triage at a glance without them requiring a manual Sheet check.
+    is_am_category = classified_posting.category == CATEGORY_TRIGGERING_LETTER_GENERATION
+    is_confident_am_match = is_am_category and not classified_posting.to_verify
 
-    if is_confident_am_match:
+    if is_am_category:
         try:
             notifier.notify_new_posting(classified_posting)
         except Exception as exc:

@@ -197,11 +197,17 @@ def test_category_a_posting_triggers_letter_generation_and_draft_creation():
     assert summary.errors == []
 
 
-def test_low_confidence_a_posting_is_stored_but_not_notified_or_lettered():
-    # Confirmed live on 2026-07-30: emailing every to_verify=True A posting
-    # (the "no signal either way" default) let real noise through — Clara
-    # asked for email reserved to confident matches only. Low-confidence
-    # postings must still be stored (visible in the tracking sheet/Excel).
+def test_low_confidence_a_posting_is_stored_and_notified_but_not_lettered():
+    # Reversed on 2026-08-04: the 2026-07-30 gate (email only on a confident
+    # match) was found live to silently swallow genuinely new AM offers
+    # whose titles didn't hit the keyword list (e.g. "Investment Risk Data
+    # Analyst", "Quantitative Research") — 12/12 real new offers between
+    # 2026-07-31 and 2026-08-03 fell into this bucket and never reached
+    # Clara's inbox. Visibility (email) is now unconditional on category;
+    # confidence still gates the auto-generated letter, since drafting a
+    # letter for a possibly-irrelevant posting is a heavier commitment than
+    # just flagging it in an email (see build_notification_message's
+    # "⚠️ À vérifier" subject prefix for how Clara tells the two apart).
     repository = InMemoryJobRepository()
     classifier = FakeClassifier(result=ClassificationResult(category="A", language="fr", to_verify=True))
     notifier = FakeNotifier()
@@ -213,7 +219,8 @@ def test_low_confidence_a_posting_is_stored_but_not_notified_or_lettered():
 
     assert repository.exists(posting().stable_id())
     assert len(summary.new_postings) == 1
-    assert notifier.notified == []
+    assert len(notifier.notified) == 1
+    assert notifier.notified[0].to_verify is True
     assert letter_generator.generated_for == []
     assert draft_creator.created_for == []
 

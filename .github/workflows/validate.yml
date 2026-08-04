@@ -40,6 +40,9 @@ jobs:
       - name: Lancer le sweep de validation
         run: python scripts/validate_offers.py
 
+      - name: Vérifier la santé des notifications (7 derniers jours)
+        run: python scripts/check_notification_health.py
+
       - name: Sauvegarder la base de données mise à jour
         if: always()
         uses: actions/cache/save@v4

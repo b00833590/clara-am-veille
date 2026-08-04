@@ -106,6 +106,29 @@ def test_no_strong_signal_either_way_defaults_to_a_and_is_flagged(title):
     assert result.to_verify is True
 
 
+# Found live on 2026-08-04: real new offers (Amundi, JP Morgan) detected
+# between 2026-07-31 and 2026-08-03 that fell through to the "no signal"
+# default (to_verify=True) purely from keyword-list gaps, not genuine
+# ambiguity — both are unambiguous AM-core roles. Confirmed against the
+# live Google Sheet: 12/12 new offers in that window were to_verify=True,
+# zero were emailed. These two are representative of the gap; see
+# rule_based_classifier.py's _AUTO_INCLUDE_PATTERN comment for the fix.
+@pytest.mark.parametrize(
+    "title,expected_category,expected_language",
+    [
+        ("Stage- Investment Risk Data Analyst H/F", "A", "fr"),
+        ("2027 Quantitative Research – Asset Management – Summer Internship", "A", "en"),
+        ("2027 Quantitative Research – Risk and Treasury – Summer Internship", "A", "en"),
+    ],
+)
+def test_matches_real_titles_missed_by_the_2026_08_04_diagnostic(title, expected_category, expected_language):
+    result = classify(title)
+
+    assert result.category == expected_category
+    assert result.language == expected_language
+    assert result.to_verify is False
+
+
 def test_wealth_management_is_a_confident_inclusion():
     result = classify("Private Banking Internship - Wealth Management Team")
     assert result.category == "A"

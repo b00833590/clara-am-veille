@@ -46,11 +46,22 @@ _AUTO_EXCLUDE_PATTERN = re.compile(
 # Strong, unambiguous AM-core signals. "Gestion privée"/"private banking"/
 # "wealth management" added 2026-07-30 — deliberate choice by Clara despite
 # the sales-adjacent tone, unlike M&A/IB which she wants excluded.
+#
+# "quantitative research" and the loosened investment-analyst match added
+# 2026-08-04 after a live diagnostic found 12/12 genuinely new offers
+# (Lazard/JPM/Amundi/Natixis) silently falling through to the "no signal"
+# default between 2026-07-31 and 2026-08-03 — none reached Clara's inbox.
+# Two concrete coverage gaps: "Quantitative Research" (JPM, several titles)
+# wasn't in the list at all, and "investment analyst" only matched the exact
+# phrase — "Investment Risk Data Analyst" (Amundi) has real words between
+# "investment" and "analyst" and didn't match. `{0,2}` tolerates up to two
+# intervening words without opening the door to unrelated "...analyst"
+# titles (still requires "investment" to lead).
 _AUTO_INCLUDE_PATTERN = re.compile(
     r"\b("
     r"discretionary portfolio management|dpm clients?|gestion de portefeuille|portfolio manage\w*|"
-    r"investment analyst|investment specialist|equity research|fixed income analyst|"
-    r"fixed income management|gestion obligataire|"
+    r"investment\s+(?:\w+\s+){0,2}analyst|investment specialist|equity research|fixed income analyst|"
+    r"fixed income management|gestion obligataire|quantitative research|"
     r"multi[- ]asset|multi[- ]gestion|fund analyst|private equity|asset allocation|allocation d'actifs|"
     r"buy[- ]side research|recherche (investissement|actions|cr[ée]dit)|"
     r"analyste (fonds|financier|investissement|actions|cr[ée]dit)|"

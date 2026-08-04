@@ -8,7 +8,11 @@ CATEGORY_LABELS = {"A": "AM prioritaire"}
 
 def build_notification_message(posting: JobPosting, recipient_email: str) -> dict:
     category_label = CATEGORY_LABELS.get(posting.category, "à classer")
-    subject = f"Nouvelle offre stage AM — {posting.company} — {posting.title}"
+    # to_verify postings are emailed since 2026-08-04 (see orchestrator.py)
+    # but never auto-lettered — the prefix lets Clara triage at a glance
+    # which ones need her own read before deciding to apply.
+    subject_prefix = "⚠️ À vérifier — " if posting.to_verify else ""
+    subject = f"{subject_prefix}Nouvelle offre stage AM — {posting.company} — {posting.title}"
     body_lines = [
         f"Entreprise : {posting.company}",
         f"Poste : {posting.title}",
